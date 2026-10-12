@@ -8,10 +8,11 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit --incremental false",
-    "api:generate": "node scripts/generate-auth-api.mjs",
-    "api:check": "node scripts/generate-auth-api.mjs --check",
-    "test": "node --test tests/auth-api.test.mjs",
-    "test:browser": "playwright test"
+    "api:generate": "node scripts/generate-auth-api.mjs && node scripts/generate-workspace-api.mjs",
+    "api:check": "node scripts/generate-auth-api.mjs --check && node scripts/generate-workspace-api.mjs --check",
+    "test": "node --test tests/auth-api.test.mjs tests/workspace-api.test.mjs",
+    "test:browser": "playwright test",
+    "lint": "oxlint --react-plugin --nextjs-plugin --jsx-a11y-plugin --deny-warnings app components/zoclip-app.tsx components/auth-view.tsx components/workspace-view.tsx lib scripts tests playwright.config.ts next.config.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -32,6 +33,7 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "oxlint": "1.0.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.3.3",
     "typescript": "5.7.3"

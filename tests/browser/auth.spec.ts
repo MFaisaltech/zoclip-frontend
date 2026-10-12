@@ -63,6 +63,10 @@ test('real registration, verification, login, reload, cross-tab logout and passw
   await expect(page.locator('p[role=alert]')).toContainText('Check your email and password')
   await signIn(page, email)
   await expect(workspace(page)).toContainText(email)
+  await expect(page.getByTestId('available-credits')).toHaveText('0')
+  await expect(page.getByText('No videos in this account. Uploads are not available in this milestone.', { exact: true })).toBeVisible()
+  await expect(page.getByText('No jobs in this account.', { exact: true })).toBeVisible()
+  await expect(page.getByText('No clips in this account.', { exact: true })).toBeVisible()
   const session = (await context.cookies(api)).find((cookie) => cookie.name === 'zoclip_session')
   // Test booleans only: never put a session cookie's value in assertion output.
   expect(Boolean(session?.httpOnly && session.sameSite === 'Lax' && session.path === '/')).toBe(true)

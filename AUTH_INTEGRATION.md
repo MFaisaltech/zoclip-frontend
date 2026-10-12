@@ -1,8 +1,9 @@
 # Phase 8, Milestone 1: authentication
 
-The frontend uses the existing FastAPI `/api/v1` contract. Authentication is real;
-projects, credits, billing and editor screens remain labeled previews. No other
-Phase 8 milestone is implemented. See the backend's
+The frontend uses the existing FastAPI `/api/v1` contract. Authentication is real.
+Milestone 2 now connects workspace and credit reads; see
+[WORKSPACE_INTEGRATION.md](WORKSPACE_INTEGRATION.md). Uploads, processing, editing,
+payments and admin workflows remain unavailable. See the backend's
 [`PHASE8_AUTH_MILESTONE.md`](../backend/docs/PHASE8_AUTH_MILESTONE.md) for outage
 recovery and verification evidence.
 

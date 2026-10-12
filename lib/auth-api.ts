@@ -37,6 +37,18 @@ function configuredOrigin(): string {
   return value
 }
 
+export function resolveApiOrigin(explicit?: string): string {
+  try {
+    const url = new URL(explicit ?? configuredOrigin())
+    const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+    if (url.username || url.password || url.search || url.hash || url.pathname !== '/' ||
+        (url.protocol !== 'https:' && !(url.protocol === 'http:' && local && process.env.NODE_ENV !== 'production'))) throw Error('Invalid origin')
+    return url.origin
+  } catch {
+    throw new AuthApiError(0, 'api_unconfigured')
+  }
+}
+
 function isUser(value: unknown): value is User {
   if (!value || typeof value !== 'object') return false
   const user = value as Partial<User>
@@ -64,20 +76,9 @@ export function createAuthClient(options: { origin?: string; fetch?: typeof fetc
   // Serializing local mutations avoids racing token rotation and logout/login.
   let tail: Promise<unknown> = Promise.resolve()
   const fetcher = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args))
-  function origin() {
-    try {
-      const url = new URL(options.origin ?? configuredOrigin())
-      const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
-      if (url.username || url.password || url.search || url.hash || url.pathname !== '/' ||
-          (url.protocol !== 'https:' && !(url.protocol === 'http:' && local && process.env.NODE_ENV !== 'production'))) throw Error('Invalid origin')
-      return url.origin
-    } catch {
-      throw new AuthApiError(0, 'api_unconfigured')
-    }
-  }
   async function request<K extends keyof AuthOperations>(operation: K, body?: AuthOperations[K]['request']): Promise<AuthOperations[K]['response']> {
     const [method, path] = operation.split(' ')
-    const url = origin() + path
+    const url = resolveApiOrigin(options.origin) + path
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000)
     try {

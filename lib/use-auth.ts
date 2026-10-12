@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { authApi, AuthApiError, type User } from './auth-api'
+import { sessionInvalidEvent } from './workspace-api'
 
 type AuthState =
   | { status: 'loading'; user: null; error: null; expired: false }
@@ -12,16 +13,22 @@ type AuthState =
 export function useAuth() {
   const [state, setState] = useState<AuthState>({ status: 'loading', user: null, error: null, expired: false })
   const version = useRef(0)
+  const authenticated = useRef(false)
   const channel = useRef<BroadcastChannel | null>(null)
   const revalidate = useCallback(async () => {
     const current = ++version.current
+    // Hide and dispose all account resources while identity is rechecked.
+    setState({ status: 'loading', user: null, error: null, expired: false })
     try {
       const user = await authApi.me()
-      if (current === version.current) setState({ status: 'authenticated', user, error: null, expired: false })
+      if (current === version.current) {
+        authenticated.current = true
+        setState({ status: 'authenticated', user, error: null, expired: false })
+      }
     } catch (error) {
       if (current !== version.current) return
       if (error instanceof AuthApiError && error.status === 401) {
-        setState((previous) => ({ status: 'anonymous', user: null, error: null, expired: previous.status === 'authenticated' || previous.expired }))
+        setState({ status: 'anonymous', user: null, error: null, expired: authenticated.current })
       } else {
         // Fail closed: a failed session check never reveals the workspace.
         setState({ status: 'unavailable', user: null, error, expired: false })
@@ -32,6 +39,13 @@ export function useAuth() {
     void revalidate()
     const onVisible = () => { if (document.visibilityState === 'visible') void revalidate() }
     const onFocus = () => { void revalidate() }
+    const onInvalid = () => {
+      ++version.current
+      authApi.clearCsrf()
+      setState({ status: 'anonymous', user: null, error: null, expired: true })
+      channel.current?.postMessage('changed')
+    }
+    window.addEventListener(sessionInvalidEvent, onInvalid)
     window.addEventListener('focus', onFocus)
     window.addEventListener('pageshow', onFocus)
     document.addEventListener('visibilitychange', onVisible)
@@ -43,6 +57,7 @@ export function useAuth() {
     return () => {
       ++version.current
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener(sessionInvalidEvent, onInvalid)
       window.removeEventListener('pageshow', onFocus)
       document.removeEventListener('visibilitychange', onVisible)
       window.clearInterval(timer)
@@ -52,16 +67,19 @@ export function useAuth() {
   }, [revalidate])
   const acceptUser = useCallback((user: User) => {
     ++version.current
+    authenticated.current = true
     setState({ status: 'authenticated', user, error: null, expired: false })
     channel.current?.postMessage('changed')
   }, [])
   const clearUser = useCallback(() => {
     ++version.current
+    authenticated.current = false
     authApi.clearCsrf()
     setState({ status: 'anonymous', user: null, error: null, expired: false })
     channel.current?.postMessage('changed')
   }, [])
   const dismissExpiry = useCallback(() => {
+    authenticated.current = false
     setState((previous) => previous.status === 'anonymous' ? { ...previous, expired: false } : previous)
   }, [])
   return { ...state, revalidate, acceptUser, clearUser, dismissExpiry }
