@@ -64,7 +64,7 @@ test('real registration, verification, login, reload, cross-tab logout and passw
   await signIn(page, email)
   await expect(workspace(page)).toContainText(email)
   await expect(page.getByTestId('available-credits')).toHaveText('0')
-  await expect(page.getByText('No videos in this account. Uploads are not available in this milestone.', { exact: true })).toBeVisible()
+  await expect(page.getByText('No videos in this account. Add your footage from the Videos tab.', { exact: true })).toBeVisible()
   await expect(page.getByText('No jobs in this account.', { exact: true })).toBeVisible()
   await expect(page.getByText('No clips in this account.', { exact: true })).toBeVisible()
   const session = (await context.cookies(api)).find((cookie) => cookie.name === 'zoclip_session')

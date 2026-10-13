@@ -135,6 +135,21 @@ export function createAuthClient(options: { origin?: string; fetch?: typeof fetc
     resetPassword: (body: AuthSchemas['ResetInput']) => mutate('POST /api/v1/auth/password/reset', body),
     rotate: () => mutate('POST /api/v1/auth/session/rotate'),
     clearCsrf: () => { csrf = null },
+    // Media mutations share the auth queue and in-memory CSRF token. Never replay here.
+    withCsrf: <T>(operation: (token: string) => Promise<T>, signal?: AbortSignal): Promise<T> => {
+      const result = tail.then(async () => {
+        signal?.throwIfAborted()
+        if (!csrf) csrf = (await request('GET /api/v1/auth/csrf')).csrf_token
+        signal?.throwIfAborted()
+        try { return await operation(csrf) }
+        catch (error) {
+          if (error instanceof AuthApiError && (error.status === 401 || error.code === 'csrf_failed')) csrf = null
+          throw error
+        }
+      })
+      tail = result.catch(() => undefined)
+      return result
+    },
   }
 }
 

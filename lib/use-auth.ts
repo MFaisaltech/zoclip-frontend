@@ -15,10 +15,10 @@ export function useAuth() {
   const version = useRef(0)
   const authenticated = useRef(false)
   const channel = useRef<BroadcastChannel | null>(null)
-  const revalidate = useCallback(async () => {
+  const revalidate = useCallback(async (background = false) => {
     const current = ++version.current
     // Hide and dispose all account resources while identity is rechecked.
-    setState({ status: 'loading', user: null, error: null, expired: false })
+    if (!background) setState({ status: 'loading', user: null, error: null, expired: false })
     try {
       const user = await authApi.me()
       if (current === version.current) {
@@ -37,8 +37,10 @@ export function useAuth() {
   }, [])
   useEffect(() => {
     void revalidate()
-    const onVisible = () => { if (document.visibilityState === 'visible') void revalidate() }
-    const onFocus = () => { void revalidate() }
+    // Background identity checks must not destroy an in-flight upload every minute,
+    // or when the native file picker returns focus. Any failure still fails closed.
+    const onVisible = () => { if (document.visibilityState === 'visible') void revalidate(true) }
+    const onFocus = () => { void revalidate(true) }
     const onInvalid = () => {
       ++version.current
       authApi.clearCsrf()

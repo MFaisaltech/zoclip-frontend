@@ -2,8 +2,9 @@
 
 The frontend uses the existing FastAPI `/api/v1` contract. Authentication is real.
 Milestone 2 now connects workspace and credit reads; see
-[WORKSPACE_INTEGRATION.md](WORKSPACE_INTEGRATION.md). Uploads, processing, editing,
-payments and admin workflows remain unavailable. See the backend's
+[WORKSPACE_INTEGRATION.md](WORKSPACE_INTEGRATION.md). Milestone 3 now connects
+uploads and processing; see [MEDIA_INTEGRATION.md](MEDIA_INTEGRATION.md).
+Editing, payments and admin workflows remain unavailable. See the backend's
 [`PHASE8_AUTH_MILESTONE.md`](../backend/docs/PHASE8_AUTH_MILESTONE.md) for outage
 recovery and verification evidence.
 
@@ -79,7 +80,10 @@ within each page and are never automatically replayed after timeout or CSRF
 failure. Another tab may change CSRF; retrying explicitly obtains a fresh token.
 Logout revokes the server session. Reset revokes all authenticated sessions.
 GET `/me` checks restore login, and focus/visibility/pageshow plus a 60-second
-visible-page timer detect expiry/revocation. BroadcastChannel synchronizes local
+visible-page timer detect expiry/revocation. Background checks preserve mounted
+transfers; any failed check still hides and disposes private data. Explicit refresh
+and cross-tab identity changes withhold the workspace during validation.
+BroadcastChannel synchronizes local
 login/logout/reset changes across tabs where supported. Without it, focus/polling
 still revalidate against the server. Server APIs enforce authorization themselves.
 

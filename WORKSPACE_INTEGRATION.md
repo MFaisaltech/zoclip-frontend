@@ -1,6 +1,8 @@
 # Phase 8, Milestone 2: workspace and credits
 
-Only read integration is in scope. Milestone 1 cookie authentication and CSRF
+This records the completed M2 read integration. M3 now adds uploads and processing;
+see [MEDIA_INTEGRATION.md](MEDIA_INTEGRATION.md). The M2-only scope notes below
+are historical. Milestone 1 cookie authentication and CSRF
 mutations remain intact. No uploads, processing requests, editing, playback,
 exports, checkout, payments or admin workflows are enabled by this frontend.
 

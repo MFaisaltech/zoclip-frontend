@@ -1,6 +1,8 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import MediaStudio from '@/components/media-studio'
+import type { MediaSchemas } from '@/lib/media-api'
 import {
   Clapperboard,
   FileVideo,
@@ -164,13 +166,12 @@ function Identifier({ label, id }: { label: string; id: string }) {
     </span>
   )
 }
-function Videos({ resource }: { resource: Resource<'videos'> }) {
+function Videos({ resource, onProcess }: { resource: Resource<'videos'>; onProcess: (id: string) => void }) {
   return (
     <ResourcePanel title="Videos" resource={resource} paginated>
       {!resource.data?.length ? (
         <Empty>
-          No videos in this account. Uploads are not available in this
-          milestone.
+          No videos in this account. Add your footage from the Videos tab.
         </Empty>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
@@ -197,17 +198,18 @@ function Videos({ resource }: { resource: Resource<'videos'> }) {
               <Identifier label="Video" id={video.id} />
               <br />
               <Identifier label="Project" id={video.project_id} />
+              <div className="mt-3"><button className={action} disabled={video.state !== 'READY'} onClick={() => onProcess(video.id)}>Review processing quote</button></div>
             </article>
           ))}
         </div>
       )}
       <Unavailable>
-        Uploads, processing requests and video playback are not connected yet.
+        Upload or import footage in Videos, then review a quote for a validated source. Video playback is a later milestone.
       </Unavailable>
     </ResourcePanel>
   )
 }
-function Jobs({ resource }: { resource: Resource<'jobs'> }) {
+function Jobs({ resource, onTrack }: { resource: Resource<'jobs'>; onTrack: (id: string) => void }) {
   return (
     <ResourcePanel title="Jobs" resource={resource} paginated>
       {!resource.data?.length ? (
@@ -247,13 +249,13 @@ function Jobs({ resource }: { resource: Resource<'jobs'> }) {
               <Identifier label="Job" id={job.id} />
               <br />
               <Identifier label="Video" id={job.video_id} />
+              <div className="mt-3"><button className={action} onClick={() => onTrack(job.id)}>Track job</button></div>
             </article>
           ))}
         </div>
       )}
       <Unavailable>
-        Job status is a snapshot. Use Refresh for updates. Starting, retrying
-        and cancelling jobs are not connected yet.
+        Track a job for live polling, recent events and cancellation. Processing percentages are shown only when the server reports them.
       </Unavailable>
     </ResourcePanel>
   )
@@ -574,6 +576,14 @@ export default function Workspace({
   const transactions = useWorkspaceResource('transactions')
   const entitlements = useWorkspaceResource('entitlements')
   const plans = useWorkspaceResource('plans')
+  const [selectedVideo, setSelectedVideo] = useState<string | null>(null)
+  const [selectedJob, setSelectedJob] = useState<string | null>(null)
+  function refreshMedia() {
+    void videos.refresh(); void jobs.refresh(); void wallet.refresh(); void transactions.refresh()
+  }
+  function selectVideo(id: string) { setSelectedVideo(id); setActive('Videos') }
+  function trackJob(id: string) { setSelectedJob(id); setActive('Videos') }
+  function acceptedJob(job: MediaSchemas['JobView']) { setSelectedJob(job.id); refreshMedia() }
   const nav = navigation.map(({ label, icon: Icon }) => (
     <button
       key={label}
@@ -684,18 +694,19 @@ export default function Workspace({
               </div>
               <div className="space-y-6">
                 <Wallet resource={wallet} />
-                <Jobs resource={jobs} />
-                <Videos resource={videos} />
+                <Jobs resource={jobs} onTrack={trackJob} />
+                <Videos resource={videos} onProcess={selectVideo} />
                 <Clips resource={clips} />
               </div>
             </>
           )}
+          <MediaStudio owner={user.id} visible={active === 'Videos'} videoId={selectedVideo} jobId={selectedJob} onJob={acceptedJob} onChanged={refreshMedia} />
           {active === 'Videos' && (
             <>
               <Heading title="Your videos">
                 Retained video records belonging to your account.
               </Heading>
-              <Videos resource={videos} />
+              <Videos resource={videos} onProcess={selectVideo} />
             </>
           )}
           {active === 'Jobs' && (
@@ -703,7 +714,7 @@ export default function Workspace({
               <Heading title="Your jobs">
                 Actual processing state from the backend.
               </Heading>
-              <Jobs resource={jobs} />
+              <Jobs resource={jobs} onTrack={trackJob} />
             </>
           )}
           {active === 'Clips' && (

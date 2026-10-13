@@ -8,11 +8,11 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit --incremental false",
-    "api:generate": "node scripts/generate-auth-api.mjs && node scripts/generate-workspace-api.mjs",
-    "api:check": "node scripts/generate-auth-api.mjs --check && node scripts/generate-workspace-api.mjs --check",
-    "test": "node --test tests/auth-api.test.mjs tests/workspace-api.test.mjs",
+    "api:generate": "node scripts/generate-auth-api.mjs && node scripts/generate-workspace-api.mjs && node scripts/generate-media-api.mjs",
+    "api:check": "node scripts/generate-auth-api.mjs --check && node scripts/generate-workspace-api.mjs --check && node scripts/generate-media-api.mjs --check",
+    "test": "node --test tests/auth-api.test.mjs tests/workspace-api.test.mjs tests/media-api.test.mjs",
     "test:browser": "playwright test",
-    "lint": "oxlint --react-plugin --nextjs-plugin --jsx-a11y-plugin --deny-warnings app components/zoclip-app.tsx components/auth-view.tsx components/workspace-view.tsx lib scripts tests playwright.config.ts next.config.mjs"
+    "lint": "oxlint --react-plugin --nextjs-plugin --jsx-a11y-plugin --deny-warnings app components/zoclip-app.tsx components/auth-view.tsx components/workspace-view.tsx components/media-studio.tsx lib scripts tests playwright.config.ts next.config.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

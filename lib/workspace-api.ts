@@ -22,6 +22,8 @@ type Schema = {
   maxLength?: number
   minimum?: number
   maximum?: number
+  exclusiveMinimum?: number
+  pattern?: string
   minItems?: number
   maxItems?: number
   items?: Schema
@@ -29,19 +31,19 @@ type Schema = {
   required?: readonly string[]
   additionalProperties?: boolean
 }
-function matches(schema: Schema, value: unknown): boolean {
+export function matches(schema: Schema, value: unknown, definitions: Readonly<Record<string, Schema>> = workspaceDefinitions): boolean {
   if (schema.$ref) {
     const name = schema.$ref
       .split('/')
-      .at(-1) as keyof typeof workspaceDefinitions
+      .at(-1)!
     return (
-      Boolean(workspaceDefinitions[name]) &&
-      matches(workspaceDefinitions[name], value)
+      Boolean(definitions[name]) &&
+      matches(definitions[name], value, definitions)
     )
   }
   if ('const' in schema) return value === schema.const
   if (schema.enum) return schema.enum.includes(value)
-  if (schema.anyOf) return schema.anyOf.some((option) => matches(option, value))
+  if (schema.anyOf) return schema.anyOf.some((option) => matches(option, value, definitions))
   switch (schema.type) {
     case 'null':
       return value === null
@@ -55,12 +57,14 @@ function matches(schema: Schema, value: unknown): boolean {
         (schema.type !== 'integer' || Number.isSafeInteger(value)) &&
         (schema.minimum === undefined || value >= schema.minimum) &&
         (schema.maximum === undefined || value <= schema.maximum)
+        && (schema.exclusiveMinimum === undefined || value > schema.exclusiveMinimum)
       )
     case 'string':
       return (
         typeof value === 'string' &&
         (schema.minLength === undefined || value.length >= schema.minLength) &&
         (schema.maxLength === undefined || value.length <= schema.maxLength) &&
+        (schema.pattern === undefined || new RegExp(schema.pattern).test(value)) &&
         (schema.format !== 'uuid' || uuid.test(value)) &&
         (schema.format !== 'date-time' || Number.isFinite(Date.parse(value)))
       )
@@ -70,7 +74,7 @@ function matches(schema: Schema, value: unknown): boolean {
         Boolean(schema.items) &&
         (schema.minItems === undefined || value.length >= schema.minItems) &&
         (schema.maxItems === undefined || value.length <= schema.maxItems) &&
-        value.every((item) => matches(schema.items!, item))
+        value.every((item) => matches(schema.items!, item, definitions))
       )
     case 'object': {
       if (!value || typeof value !== 'object' || Array.isArray(value))
@@ -80,7 +84,7 @@ function matches(schema: Schema, value: unknown): boolean {
         (schema.required ?? []).every((key) => Object.hasOwn(object, key)) &&
         Object.entries(schema.properties ?? {}).every(
           ([key, property]) =>
-            !Object.hasOwn(object, key) || matches(property, object[key]),
+            !Object.hasOwn(object, key) || matches(property, object[key], definitions),
         ) &&
         (schema.additionalProperties !== false ||
           Object.keys(object).every((key) =>
