@@ -1,5 +1,9 @@
 # Phase 8, Milestone 2: workspace and credits
 
+Milestones 3–4 now add media ingestion/processing and the
+[clip editor/export integration](EDITOR_INTEGRATION.md). The read-only scope
+below records the original M2 implementation.
+
 This records the completed M2 read integration. M3 now adds uploads and processing;
 see [MEDIA_INTEGRATION.md](MEDIA_INTEGRATION.md). The M2-only scope notes below
 are historical. Milestone 1 cookie authentication and CSRF

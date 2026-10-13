@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import MediaStudio from '@/components/media-studio'
+import { Highlights, ClipEditor } from '@/components/clip-workbench'
 import type { MediaSchemas } from '@/lib/media-api'
 import {
   Clapperboard,
@@ -166,7 +167,7 @@ function Identifier({ label, id }: { label: string; id: string }) {
     </span>
   )
 }
-function Videos({ resource, onProcess }: { resource: Resource<'videos'>; onProcess: (id: string) => void }) {
+function Videos({ resource, onProcess, onHighlights }: { resource: Resource<'videos'>; onProcess: (id: string) => void; onHighlights: (id: string) => void }) {
   return (
     <ResourcePanel title="Videos" resource={resource} paginated>
       {!resource.data?.length ? (
@@ -199,6 +200,7 @@ function Videos({ resource, onProcess }: { resource: Resource<'videos'>; onProce
               <br />
               <Identifier label="Project" id={video.project_id} />
               <div className="mt-3"><button className={action} disabled={video.state !== 'READY'} onClick={() => onProcess(video.id)}>Review processing quote</button></div>
+              <div className="mt-2"><button className={action} disabled={video.state !== 'READY'} onClick={() => onHighlights(video.id)}>View AI highlights</button></div>
             </article>
           ))}
         </div>
@@ -260,7 +262,7 @@ function Jobs({ resource, onTrack }: { resource: Resource<'jobs'>; onTrack: (id:
     </ResourcePanel>
   )
 }
-function Clips({ resource }: { resource: Resource<'clips'> }) {
+function Clips({ resource, onEdit }: { resource: Resource<'clips'>; onEdit: (id: string) => void }) {
   return (
     <ResourcePanel title="Clips" resource={resource} paginated>
       {!resource.data?.length ? (
@@ -292,13 +294,13 @@ function Clips({ resource }: { resource: Resource<'clips'> }) {
               <Identifier label="Clip" id={clip.id} />
               <br />
               <Identifier label="Video" id={clip.video_id} />
+              <div className="mt-3"><button className={action} onClick={() => onEdit(clip.id)}>Open clip editor</button></div>
             </article>
           ))}
         </div>
       )}
       <Unavailable>
-        These are saved clip records. Render availability is not supplied by
-        this listing. Preview, editing and export are not connected yet.
+        Open a clip to edit its saved revision, inspect actual render records and download private MP4 exports.
       </Unavailable>
     </ResourcePanel>
   )
@@ -578,12 +580,16 @@ export default function Workspace({
   const plans = useWorkspaceResource('plans')
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
+  const [highlightsVideo, setHighlightsVideo] = useState<string | null>(null)
+  const [editingClip, setEditingClip] = useState<string | null>(null)
   function refreshMedia() {
-    void videos.refresh(); void jobs.refresh(); void wallet.refresh(); void transactions.refresh()
+    void videos.refresh(); void jobs.refresh(); void wallet.refresh(); void transactions.refresh(); void clips.refresh()
   }
   function selectVideo(id: string) { setSelectedVideo(id); setActive('Videos') }
   function trackJob(id: string) { setSelectedJob(id); setActive('Videos') }
   function acceptedJob(job: MediaSchemas['JobView']) { setSelectedJob(job.id); refreshMedia() }
+  function showHighlights(id: string) {setHighlightsVideo(id); setActive('Clips')}
+  function editClip(id: string) {setEditingClip(id); setActive('Clips')}
   const nav = navigation.map(({ label, icon: Icon }) => (
     <button
       key={label}
@@ -695,8 +701,8 @@ export default function Workspace({
               <div className="space-y-6">
                 <Wallet resource={wallet} />
                 <Jobs resource={jobs} onTrack={trackJob} />
-                <Videos resource={videos} onProcess={selectVideo} />
-                <Clips resource={clips} />
+                <Videos resource={videos} onProcess={selectVideo} onHighlights={showHighlights} />
+                <Clips resource={clips} onEdit={editClip} />
               </div>
             </>
           )}
@@ -706,7 +712,7 @@ export default function Workspace({
               <Heading title="Your videos">
                 Retained video records belonging to your account.
               </Heading>
-              <Videos resource={videos} onProcess={selectVideo} />
+              <Videos resource={videos} onProcess={selectVideo} onHighlights={showHighlights} />
             </>
           )}
           {active === 'Jobs' && (
@@ -722,7 +728,9 @@ export default function Workspace({
               <Heading title="Your clips">
                 Saved clip preferences and revisions.
               </Heading>
-              <Clips resource={clips} />
+              {highlightsVideo && <Highlights key={highlightsVideo} owner={user.id} videoId={highlightsVideo} onClip={editClip} onChanged={refreshMedia} />}
+              {editingClip && <ClipEditor key={editingClip} owner={user.id} clipId={editingClip} onChanged={refreshMedia} />}
+              <Clips resource={clips} onEdit={editClip} />
             </>
           )}
           {active === 'Credits & plans' && (

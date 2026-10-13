@@ -4,7 +4,8 @@ The frontend uses the existing FastAPI `/api/v1` contract. Authentication is rea
 Milestone 2 now connects workspace and credit reads; see
 [WORKSPACE_INTEGRATION.md](WORKSPACE_INTEGRATION.md). Milestone 3 now connects
 uploads and processing; see [MEDIA_INTEGRATION.md](MEDIA_INTEGRATION.md).
-Editing, payments and admin workflows remain unavailable. See the backend's
+Milestone 4 adds [editing and exports](EDITOR_INTEGRATION.md). Payments and admin
+workflows remain unavailable. See the backend's
 [`PHASE8_AUTH_MILESTONE.md`](../backend/docs/PHASE8_AUTH_MILESTONE.md) for outage
 recovery and verification evidence.
 

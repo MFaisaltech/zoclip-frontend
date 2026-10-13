@@ -69,7 +69,7 @@ test('real upload, quote without charge, lost generation acknowledgment/reload r
   await quote(page).getByRole('button',{name:'Recover confirmed request',exact:true}).click()
   await expect(live(page).getByRole('status')).toContainText('SUGGESTIONS READY',{timeout:30000})
   await expect(live(page)).toContainText('Progress unavailable')
-  await expect(live(page)).toContainText('Rendering and editing are a later milestone')
+  await expect(live(page)).toContainText('Open AI highlights for this video to create drafts and approve exports')
   await live(page).getByRole('button',{name:'Load recent events',exact:true}).click()
   await expect(live(page).getByRole('list',{name:'Recent job events'})).toContainText('analyzing')
   await live(page).getByRole('button',{name:'Cancel job',exact:true}).click()

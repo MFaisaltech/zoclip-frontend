@@ -9,6 +9,17 @@ export function mediaErrorMessage(error: unknown): string {
   if (!(error instanceof AuthApiError)) return 'Unable to finish. Retry to check the server and continue.'
   const messages: Record<string, string> = {
     insufficient_credits: 'You do not have enough available credits. No new job was started.',
+    revision_conflict: 'This clip changed in another request. Your edits are preserved locally. Reload the server revision before saving again.',
+    render_busy: 'A render is active. Wait for it to finish before editing or rendering again.',
+    export_limit: 'The reserved output or edit quota has been reached.',
+    edit_limit: 'The edit allowance has been reached.',
+    quote_required: 'The prepaid edit allowance is exhausted. Review a fresh quote before reserving more credits.',
+    feature_not_reserved: 'This feature was not included in the original quote. Use the originally reserved caption and framing options.',
+    already_rendered: 'This revision already has an export request. Check its status; make a new revision for another attempt.',
+    selection_closed: 'This job already has an approved selection or is no longer available for selection.',
+    invalid_trim: 'Trim must stay within the validated source duration.',
+    invalid_captions: 'Caption words must be ordered, nonoverlapping and inside the trim.',
+    transcript_unavailable: 'The transcript is not available for this job yet.',
     quote_expired: 'This quote expired. Request a fresh quote and review it again.',
     quote_stale: 'Pricing changed. Request a fresh quote and review it again.',
     unsupported_source: 'This URL is unsupported. Use a direct HTTPS MP4 or WebM URL on a host approved by ZoClip.',
@@ -54,6 +65,7 @@ export function createMediaApi(options: {
     async call<K extends MediaOperation>(name: K, args: {
       params?: Record<string, string | number>; body?: MediaOperations[K]['request'];
       key?: string; binary?: Blob; sha256?: string; signal?: AbortSignal;
+      query?: Record<string, string | number>; revision?: number;
     } = {}): Promise<MediaOperations[K]['response']> {
       const descriptor = mediaDescriptors[name]
       const path = descriptor.path.replace(/\{(\w+)\}/g, (_, key: string) => {
@@ -66,6 +78,16 @@ export function createMediaApi(options: {
         throw new AuthApiError(0, 'invalid_request')
       if (descriptor.binary && (!args.binary || !/^[a-f0-9]{64}$/.test(args.sha256 ?? '')))
         throw new AuthApiError(0, 'invalid_request')
+      if (descriptor.revisionHeader && (!Number.isInteger(args.revision) || args.revision! < 1 || args.revision! > 101))
+        throw new AuthApiError(0, 'invalid_request')
+      const query = new URLSearchParams()
+      for (const [key, value] of Object.entries(args.query ?? {})) {
+        if (!(descriptor.queries as readonly string[]).includes(key) ||
+          (key.endsWith('_id') ? !uuid.test(String(value)) : !Number.isSafeInteger(Number(value)) || Number(value) < 1))
+          throw new AuthApiError(0, 'invalid_request')
+        query.set(key, String(value))
+      }
+      if (name === 'events') query.set('limit', '20')
       if (!descriptor.binary && !matches(descriptor.request, args.body ?? null, mediaDefinitions))
         throw new AuthApiError(0, 'invalid_request')
       const perform = async (token?: string) => {
@@ -75,16 +97,37 @@ export function createMediaApi(options: {
         args.signal?.addEventListener('abort', abort, { once: true })
         const timer = setTimeout(abort, options.timeoutMs ?? (descriptor.binary ? 65000 : 15000))
         try {
-          const response = await fetcher(resolveApiOrigin(options.origin) + path + (name === 'events' ? '?limit=20' : ''), {
+          const response = await fetcher(resolveApiOrigin(options.origin) + path + (query.size ? '?' + query : ''), {
             method: descriptor.method, credentials: 'include', cache: 'no-store', signal: controller.signal,
             headers: {
               ...(token && {'X-CSRF-Token': token}),
+              ...(descriptor.revisionHeader && {'If-Match': `"${args.revision}"`}),
               ...(descriptor.idempotent && {'Idempotency-Key': args.key!}),
               ...(descriptor.binary ? {'Content-Type': 'application/octet-stream', 'X-Content-SHA256': args.sha256!} :
                 args.body && {'Content-Type': 'application/json'}),
             },
             ...(descriptor.binary ? {body: args.binary} : args.body && {body: JSON.stringify(args.body)}),
           })
+          if (response.ok && descriptor.download) {
+            if (response.headers.get('Content-Type')?.split(';')[0] !== 'video/mp4' || !response.body)
+              throw new AuthApiError(0, 'invalid_response')
+            const reader = response.body.getReader(), chunks: Uint8Array[] = []
+            let size = 0
+            try {
+              while (true) {
+                args.signal?.throwIfAborted()
+                if (controller.signal.aborted) throw new AuthApiError(0, 'timeout')
+                const next = await reader.read()
+                if (next.done) break
+                size += next.value.length
+                if (size > 512 * 1024 * 1024) throw new AuthApiError(0, 'invalid_response')
+                chunks.push(next.value)
+              }
+              args.signal?.throwIfAborted()
+              if (!size) throw new AuthApiError(0, 'invalid_response')
+              return new Blob(chunks, {type: 'video/mp4'}) as MediaOperations[K]['response']
+            } finally { await reader.cancel().catch(() => undefined) }
+          }
           const data: unknown = response.status === 204 ? null : await response.json().catch(() => null)
           args.signal?.throwIfAborted() // A late old-account response must not invalidate the new account.
           if (controller.signal.aborted) throw new AuthApiError(0, 'timeout')

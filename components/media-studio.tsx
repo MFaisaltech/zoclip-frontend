@@ -81,7 +81,7 @@ export function JobMonitor({jobId, onChanged}: {jobId: string; onChanged: () => 
       <p className="my-2 text-xs text-[#8a857f]">Queue position: unavailable · Heartbeat: {job.heartbeat_at ? new Date(job.heartbeat_at).toLocaleString() : 'Unavailable'}</p>
       {job.error_code && <p className="my-3 text-sm text-red-800">Server code: {job.error_code}</p>}
       {job.state === 'WAITING_ENGINE' && <p className="my-3 text-sm">The AI engine is unavailable. This job is waiting; no clips are ready. You can cancel its credit hold.</p>}
-      {job.state === 'SUGGESTIONS_READY' && <p className="my-3 text-sm">AI suggestions are ready. Rendering and editing are a later milestone. Credits remain held until a deliverable or cancellation; inactive holds expire after 24 hours.</p>}
+      {job.state === 'SUGGESTIONS_READY' && <p className="my-3 text-sm">AI suggestions are ready. Open AI highlights for this video to create drafts and approve exports. Credits remain held until a deliverable or cancellation; inactive holds expire after 24 hours.</p>}
       {job.state === 'COMPLETED' && ['VALIDATE', 'IMPORT'].includes(job.kind) && <p className="my-3 text-sm">Source validated. Select it below to review a processing quote.</p>}
       {job.state === 'FAILED' && <p className="my-3 text-sm">This job failed. Review its server code and events. Processing credits release on final failure. A new processing attempt requires a new quote and confirmation.</p>}
       {job.state === 'CANCEL_REQUESTED' && <p className="my-3 text-sm">Cancellation requested. Waiting for the worker to acknowledge it safely.</p>}
@@ -103,6 +103,7 @@ export function Generation({owner, videoId, onJob}: {owner: string; videoId: str
   const [video, setVideo] = useState<Video | null>(null)
   const [request, setRequest] = useState<Confirmed | null>(null)
   const [count, setCount] = useState(1)
+  const [edits, setEdits] = useState(0)
   const [captions, setCaptions] = useState(true)
   const [reframe, setReframe] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -130,7 +131,7 @@ export function Generation({owner, videoId, onJob}: {owner: string; videoId: str
         const duration = source.metadata_json.duration_seconds
         if (source.state !== 'READY' || typeof duration !== 'number' || !Number.isSafeInteger(duration) || duration < 1 || duration > 7200)
           throw new AuthApiError(409, 'source_not_ready')
-        const body = {source_seconds: duration, output_count: count, edit_count: 0, captions, reframe}
+        const body = {source_seconds: duration, output_count: count, edit_count: edits, captions, reframe}
         const payload = JSON.stringify(body)
         if (quoteAttempt.current?.payload !== payload) quoteAttempt.current = {payload, key: crypto.randomUUID()}
         const quote = await mediaApi.call('quote', {body, key: quoteAttempt.current.key, signal: active.signal})
@@ -160,13 +161,14 @@ export function Generation({owner, videoId, onJob}: {owner: string; videoId: str
     <p className="mb-4 text-sm leading-6 text-[#77736e]">Processing extracts audio for Deepgram transcription and sends the transcript to Gemini for suggestions when those services are configured. Source retention is shown in your video list. This step does not render clips. Credits are reserved on confirmation and released on final failure or cancellation.</p>
     {!request && <div className="space-y-3">
       <label htmlFor="output-count" className="block text-sm">Maximum outputs<input id="output-count" className={input} type="number" min={1} max={100} value={count} disabled={busy} onChange={e => setCount(Number(e.target.value))} /></label>
+      <label htmlFor="edit-count" className="block text-sm">Included re-exports<input id="edit-count" className={input} type="number" min={0} max={100} value={edits} disabled={busy} onChange={e => setEdits(Number(e.target.value))} /></label>
       <label htmlFor="quote-captions" className="flex items-center gap-2 text-sm"><input id="quote-captions" type="checkbox" checked={captions} disabled={busy} onChange={e => setCaptions(e.target.checked)} />Include captions in quote</label>
       <label htmlFor="quote-reframe" className="flex items-center gap-2 text-sm"><input id="quote-reframe" type="checkbox" checked={reframe} disabled={busy} onChange={e => setReframe(e.target.checked)} />Include reframing in quote</label>
-      <button className={primary} disabled={!loaded || busy || !Number.isInteger(count) || count < 1 || count > 100} onClick={() => { void act(false) }}>{busy ? 'Requesting quote…' : 'Get processing quote'}</button>
+      <button className={primary} disabled={!loaded || busy || !Number.isInteger(count) || count < 1 || count > 100 || !Number.isInteger(edits) || edits < 0 || edits > 100} onClick={() => { void act(false) }}>{busy ? 'Requesting quote…' : 'Get processing quote'}</button>
     </div>}
     {request && <div className="rounded-xl bg-[#f2efff] p-4 text-sm">
       <p className="font-semibold">{request.quote.credits.toLocaleString()} credits to reserve</p>
-      <p className="mt-2">{request.quote.request.source_seconds} source seconds · {request.quote.request.output_count} maximum outputs · Captions {request.quote.request.captions ? 'included' : 'excluded'} · Reframing {request.quote.request.reframe ? 'included' : 'excluded'}</p>
+      <p className="mt-2">{request.quote.request.source_seconds} source seconds · {request.quote.request.output_count} maximum outputs · {request.quote.request.edit_count ?? 0} included re-exports · Captions {request.quote.request.captions ? 'included' : 'excluded'} · Reframing {request.quote.request.reframe ? 'included' : 'excluded'}</p>
       <p className="my-2">Quote expires {new Date(request.quote.expires_at).toLocaleString()}</p>
       {request.confirmed && <p className="my-3">You already confirmed this request. Recover it using the same key to avoid a duplicate credit hold.</p>}
       <div className="flex flex-wrap gap-2"><button className={primary} disabled={busy} onClick={() => { void act(true) }}>{busy ? 'Checking request…' : request.confirmed ? 'Recover confirmed request' : `Confirm and reserve ${request.quote.credits} credits`}</button>

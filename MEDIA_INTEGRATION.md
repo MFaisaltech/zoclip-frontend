@@ -1,5 +1,9 @@
 # Phase 8, Milestone 3: video uploads and AI processing
 
+M4 now adds transcript/highlights, clip editing, captions and exports. See
+[EDITOR_INTEGRATION.md](EDITOR_INTEGRATION.md); M3-only scope statements below
+record the prior completed milestone.
+
 The Videos tab connects to the existing FastAPI contract. Authenticated users can
 upload MP4/WebM, import authorized direct HTTPS media, review a quote, explicitly
 confirm a credit reservation, and track/cancel the resulting job. Editing,

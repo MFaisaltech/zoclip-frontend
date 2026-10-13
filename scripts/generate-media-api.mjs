@@ -19,6 +19,15 @@ const selected = {
   job: ['get', '/api/v1/jobs/{job_id}'],
   events: ['get', '/api/v1/jobs/{job_id}/events'],
   cancel: ['post', '/api/v1/jobs/{job_id}/cancel'],
+  transcript: ['get', '/api/v1/videos/{video_id}/transcript'],
+  suggestions: ['get', '/api/v1/videos/{video_id}/suggestions'],
+  createClip: ['post', '/api/v1/clips'],
+  clip: ['get', '/api/v1/clips/{clip_id}'],
+  editClip: ['patch', '/api/v1/clips/{clip_id}'],
+  selectClips: ['post', '/api/v1/jobs/{job_id}/renders'],
+  renderClip: ['post', '/api/v1/clips/{clip_id}/render'],
+  outputs: ['get', '/api/v1/clips/{clip_id}/renders'],
+  download: ['get', '/api/v1/clips/{clip_id}/download'],
 }
 const required = new Set()
 function type(schema) {
@@ -74,9 +83,12 @@ const operations = Object.entries(selected).map(([name, [method, path]]) => {
   )
     throw Error('Unexpected pagination contract')
   descriptors[name] = { path, method: method.toUpperCase(), response, request,
+    queries: parameters.filter(p => p.in === 'query').map(p => p.name),
+    revisionHeader: parameters.some(p => p.name.toLowerCase() === 'if-match'),
+    download: Boolean(operation.responses[success]?.content?.['video/mp4']),
     idempotent: parameters.some(p => p.name.toLowerCase() === 'idempotency-key'),
     binary: Boolean(operation.requestBody?.content?.['application/octet-stream']) }
-  return `  ${name}: { request: ${type(request)}; response: ${type(response)} }`
+  return `  ${name}: { request: ${type(request)}; response: ${name === 'download' ? 'Blob' : type(response)} }`
 })
 const definitions = {}
 const schemas = []
