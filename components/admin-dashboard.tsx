@@ -5,7 +5,7 @@ import type { User } from '@/lib/auth-api';
 import type { MediaSchemas } from '@/lib/media-api';
 import { useFinance, useFinancePage } from '@/lib/use-finance';
 import { useWorkspaceResource } from '@/lib/use-workspace';
-import { financeError, formatPaisa, ruleLabels } from '@/lib/billing';
+import { consumptionRules, financeError, formatPaisa, ruleLabels } from '@/lib/billing';
 import { persistFinancialIntent, readFinancialIntent, sendFinancialIntent, type FinancialIntent } from '@/lib/finance-actions';
 import { FinanceHeading, FinancePanel, FinanceEmpty, FinanceStat, FinanceBadge, FinancePager, financeAction, financeInput, financeDate } from './finance-ui';
 type Plan = MediaSchemas['PlanView'];
@@ -215,7 +215,7 @@ function FinancialAction({ adminId, action, pending, onClose, onChanged }: {
             else if (action.kind === 'access')
                 value = persistFinancialIntent(adminId, { operation: 'grantAccess', resourceId: action.customer.id, body: { price_version_id: selectedPrice, reason } }, sessionStorage);
             else if (action.kind === 'plan')
-                value = persistFinancialIntent(adminId, { operation: 'configurePlan', resourceId: action.plan.id, body: { price_paisa: Number(planFields.price_paisa), included_credits: Number(planFields.included_credits), valid_days: Number(planFields.valid_days) as 0 | 30, approved: planFields.approved, rules: Object.fromEntries(Object.entries(rules).map(([k, v]) => [k, Number(v)])) as MediaSchemas['ConsumptionRules'], reason } }, sessionStorage);
+                value = persistFinancialIntent(adminId, { operation: 'configurePlan', resourceId: action.plan.id, body: { price_paisa: Number(planFields.price_paisa), included_credits: Number(planFields.included_credits), valid_days: Number(planFields.valid_days) as 0 | 30, approved: planFields.approved, rules: consumptionRules(rules, action.plan.price?.rules), reason } }, sessionStorage);
             else
                 throw new Error('Unknown financial action');
             setIntent(value);

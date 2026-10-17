@@ -479,7 +479,7 @@ function Plans({ resource }: { resource: Resource<'plans'> }) {
                       {Object.entries(plan.price.rules).map(([key, value]) => (
                         <div key={key} className="flex justify-between gap-3">
                           <dt className="capitalize">{human(key)}</dt>
-                          <dd>{credits(value)}</dd>
+                          <dd>{typeof value==='number'?credits(value):value===null?'Not set':value?'Yes':'No'}</dd>
                         </div>
                       ))}
                     </dl>

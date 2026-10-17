@@ -25,7 +25,7 @@ async function load(name) {
 }
 const {createMediaApi} = await import(await load('media-api'))
 const {AuthApiError} = await import(await load('auth-api'))
-const {formatPaisa} = await import(await load('billing'))
+const {formatPaisa,consumptionRules} = await import(await load('billing'))
 const {persistFinancialIntent,readFinancialIntent,sendFinancialIntent} = await import(await load('finance-actions'))
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`
 const json = (value,status=200) => new Response(JSON.stringify(value),{status})
@@ -37,6 +37,16 @@ test('PKR integer formatting does not round financial amounts',()=>{
   assert.equal(formatPaisa(199),'PKR 1.99')
   assert.equal(formatPaisa(0),'PKR 0.00')
   assert.throws(()=>formatPaisa(1.1));assert.throws(()=>formatPaisa(-1))
+})
+
+test('staff price edits preserve lifetime and retired-purchase restrictions',()=>{
+  const rules=consumptionRules({minimum_job_credits:'60',credits_per_minute:'5',credits_per_output:'2',
+    credits_per_edit:'2',captions_credits:'0',reframe_credits:'0',max_source_seconds:'300',max_outputs:'1',
+    max_edits:'0',max_concurrent_jobs:'1',daily_credits:'60',monthly_credits:'60'},
+    {purchasable:false,lifetime_output_limit:1})
+  assert.equal(rules.purchasable,false)
+  assert.equal(rules.lifetime_output_limit,1)
+  assert.equal(rules.max_source_seconds,300)
 })
 test('billing and staff reads use existing cookies, no-store and bounded pagination',async()=>{
   const seen=[]

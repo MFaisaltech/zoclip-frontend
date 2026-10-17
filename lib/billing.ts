@@ -1,4 +1,20 @@
 import { AuthApiError, authErrorMessage } from './auth-api';
+import type { MediaSchemas } from './media-schema';
+
+export function consumptionRules(fields: Record<string,string>, original?: MediaSchemas['ConsumptionRules']): MediaSchemas['ConsumptionRules'] {
+    return {
+        purchasable: original?.purchasable ?? true,
+        lifetime_output_limit: original?.lifetime_output_limit ?? null,
+        minimum_job_credits: Number(fields.minimum_job_credits),
+        credits_per_minute: Number(fields.credits_per_minute),
+        credits_per_output: Number(fields.credits_per_output),
+        credits_per_edit: Number(fields.credits_per_edit),
+        captions_credits: Number(fields.captions_credits), reframe_credits: Number(fields.reframe_credits),
+        max_source_seconds: Number(fields.max_source_seconds), max_outputs: Number(fields.max_outputs),
+        max_edits: Number(fields.max_edits), max_concurrent_jobs: Number(fields.max_concurrent_jobs),
+        daily_credits: Number(fields.daily_credits), monthly_credits: Number(fields.monthly_credits),
+    };
+}
 export function formatPaisa(value: number): string {
     if (!Number.isSafeInteger(value) || value < 0)
         throw new Error('Invalid PKR amount');

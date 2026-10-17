@@ -9,6 +9,7 @@ export function mediaErrorMessage(error: unknown): string {
   if (!(error instanceof AuthApiError)) return 'Unable to finish. Retry to check the server and continue.'
   const messages: Record<string, string> = {
     insufficient_credits: 'You need more credits to create these clips. No new attempt was started.',
+    lifetime_output_limit: 'Your lifetime trial clip has already been used or is being generated.',
     revision_conflict: 'This clip has changed. Reload it before saving your edits.',
     render_busy: 'Your clip is being created. Wait for it to finish before editing again.',
     export_limit: 'You’ve reached the clip allowance for this video.',

@@ -1,5 +1,5 @@
 // Generated from backend/docs/openapi.json. Do not edit.
-// Source SHA-256: b7deca3dfd32dce14ad9c43d69d26cc9a72147d9a452dccc2227102834196c64
+// Source SHA-256: 7c377042b2aa05bbf7a94c7e34bf34e630d1bbf9433297ea8ae0ae0ea0b5f469
 export interface WorkspaceSchemas {
   "VideoView": { "id": string; "project_id": string; "state": string; "metadata_json": Record<string, unknown>; "created_at": string; "expires_at": string }
   "JobView": { "id": string; "video_id": string; "kind": string; "state": string; "error_code": string | null; "attempts": number; "created_at": string; "updated_at": string; "stage": string; "progress_percent": number | null; "estimated_credits": number | null; "heartbeat_at": string | null; "queue_position"?: null; "reservation_id": string | null }
@@ -12,7 +12,7 @@ export interface WorkspaceSchemas {
   "TransactionView": { "id": string; "operation": string; "available_delta": number; "reserved_delta": number; "available_after": number; "reserved_after": number; "reservation_id": string | null; "created_at": string }
   "PriceView": { "id": string; "price_paisa": number; "included_credits": number; "valid_days": number; "approved": boolean; "rules": WorkspaceSchemas["ConsumptionRules"] }
   "CaptionWord": { "text": string; "start_ms": number; "end_ms": number }
-  "ConsumptionRules": { "minimum_job_credits"?: number; "credits_per_minute": number; "credits_per_output": number; "credits_per_edit": number; "captions_credits": number; "reframe_credits": number; "max_source_seconds": number; "max_outputs": number; "max_edits": number; "max_concurrent_jobs": number; "daily_credits": number; "monthly_credits": number }
+  "ConsumptionRules": { "purchasable"?: boolean; "lifetime_output_limit"?: number | null; "minimum_job_credits"?: number; "credits_per_minute": number; "credits_per_output": number; "credits_per_edit": number; "captions_credits": number; "reframe_credits": number; "max_source_seconds": number; "max_outputs": number; "max_edits": number; "max_concurrent_jobs": number; "daily_credits": number; "monthly_credits": number }
 }
 export interface WorkspaceResponses {
   videos: Array<WorkspaceSchemas["VideoView"]>
@@ -700,6 +700,24 @@ export const workspaceDefinitions = {
   },
   "ConsumptionRules": {
     "properties": {
+      "purchasable": {
+        "type": "boolean",
+        "title": "Purchasable",
+        "default": true
+      },
+      "lifetime_output_limit": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "maximum": 1000000000000,
+            "minimum": 1
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Lifetime Output Limit"
+      },
       "minimum_job_credits": {
         "type": "integer",
         "maximum": 1000000000000,

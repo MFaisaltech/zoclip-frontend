@@ -1,5 +1,5 @@
 // Generated from backend/docs/openapi.json. Do not edit.
-// Source SHA-256: b7deca3dfd32dce14ad9c43d69d26cc9a72147d9a452dccc2227102834196c64
+// Source SHA-256: 7c377042b2aa05bbf7a94c7e34bf34e630d1bbf9433297ea8ae0ae0ea0b5f469
 export interface MediaSchemas {
   "UploadInput": { "size_bytes": number; "sha256": string; "rights_attested": true }
   "UploadView": { "id": string; "video_id": string; "state": string; "expected_bytes": number; "part_bytes": number; "expires_at": string; "received_parts"?: Array<number> }
@@ -47,7 +47,7 @@ export interface MediaSchemas {
   "BudgetLimits-Output": { "per_job_usd": string; "user_daily_usd": string; "user_monthly_usd": string; "global_daily_usd": string; "global_monthly_usd": string; "max_open_reservations": number; "rate_ids": Array<string>; "input_tokens_per_second": number; "max_output_tokens": number; "render_cpu_seconds_per_output": number; "storage_gb_days_per_output": number; "max_attempts_per_job": number }
   "AuditView": { "id": string; "actor_id": string | null; "action": string; "target_id": string | null; "request_id": string; "created_at": string }
   "RefundView": { "id": string; "order_id": string; "kind": string; "amount_paisa": number; "recovered_credits": number; "unrecovered_credits": number }
-  "ConsumptionRules": { "minimum_job_credits"?: number; "credits_per_minute": number; "credits_per_output": number; "credits_per_edit": number; "captions_credits": number; "reframe_credits": number; "max_source_seconds": number; "max_outputs": number; "max_edits": number; "max_concurrent_jobs": number; "daily_credits": number; "monthly_credits": number }
+  "ConsumptionRules": { "purchasable"?: boolean; "lifetime_output_limit"?: number | null; "minimum_job_credits"?: number; "credits_per_minute": number; "credits_per_output": number; "credits_per_edit": number; "captions_credits": number; "reframe_credits": number; "max_source_seconds": number; "max_outputs": number; "max_edits": number; "max_concurrent_jobs": number; "daily_credits": number; "monthly_credits": number }
   "Word": { "word": string; "punctuated_word": string; "start": number; "end": number; "confidence": number; "speaker"?: number | null }
 }
 export interface MediaOperations {
@@ -2783,6 +2783,24 @@ export const mediaDefinitions = {
   },
   "ConsumptionRules": {
     "properties": {
+      "purchasable": {
+        "type": "boolean",
+        "title": "Purchasable",
+        "default": true
+      },
+      "lifetime_output_limit": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "maximum": 1000000000000,
+            "minimum": 1
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Lifetime Output Limit"
+      },
       "minimum_job_credits": {
         "type": "integer",
         "maximum": 1000000000000,

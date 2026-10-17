@@ -71,7 +71,7 @@ export default function BillingView({ wallet, ledger, access, catalog }: {
         </div>{catalog}{price && <FinancePanel title="Your applied usage rules" resource={overview}>
             <dl className="grid gap-x-10 gap-y-3 sm:grid-cols-2">{Object.entries(price.rules).map(([key, value]) => <div key={key} className="flex justify-between gap-4 text-sm">
                 <dt className="text-[#77736e]">{ruleLabels[key] ?? key}</dt>
-                <dd className="font-medium tabular-nums">{value.toLocaleString()}</dd>
+                <dd className="font-medium tabular-nums">{typeof value==='number'?value.toLocaleString():value===null?'Not set':value?'Yes':'No'}</dd>
                 </div>)}</dl>
             </FinancePanel>}</>}
   </div>;
