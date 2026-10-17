@@ -14,6 +14,7 @@ const selected = {
   deleteUpload: ['delete', '/api/v1/uploads/{upload_id}'],
   importUrl: ['post', '/api/v1/videos/import-url'],
   quote: ['post', '/api/v1/jobs/quote'],
+  quotePreview: ['post', '/api/v1/jobs/quote-preview'],
   generate: ['post', '/api/v1/videos/{video_id}/generate'],
   video: ['get', '/api/v1/videos/{video_id}'],
   job: ['get', '/api/v1/jobs/{job_id}'],
@@ -28,6 +29,20 @@ const selected = {
   renderClip: ['post', '/api/v1/clips/{clip_id}/render'],
   outputs: ['get', '/api/v1/clips/{clip_id}/renders'],
   download: ['get', '/api/v1/clips/{clip_id}/download'],
+  billingOverview: ['get', '/api/v1/me/billing'],
+  reservations: ['get', '/api/v1/me/credit-reservations'],
+  billingHistory: ['get', '/api/v1/billing/history'],
+  adminOverview: ['get', '/api/v1/admin/dashboard'],
+  customers: ['get', '/api/v1/admin/customers'],
+  customerBilling: ['get', '/api/v1/admin/customers/{user_id}/billing'],
+  staffJobs: ['get', '/api/v1/admin/jobs'],
+  usageCosts: ['get', '/api/v1/admin/usage-costs'],
+  limits: ['get', '/api/v1/admin/limits'],
+  audits: ['get', '/api/v1/admin/audit-logs'],
+  payments: ['get', '/api/v1/admin/payments'],
+  adjustCredits: ['post', '/api/v1/admin/users/{user_id}/credit-adjustments'],
+  configurePlan: ['post', '/api/v1/admin/plans/{plan_id}/versions'],
+  grantAccess: ['post', '/api/v1/admin/users/{user_id}/entitlements'],
 }
 const required = new Set()
 function type(schema) {
@@ -44,7 +59,8 @@ function type(schema) {
   if (schema.anyOf) return schema.anyOf.map(type).join(' | ')
   if (schema.type === 'array') return `Array<${type(schema.items)}>`
   if (schema.type === 'object') {
-    if (!schema.properties) return 'Record<string, unknown>'
+    if (!schema.properties) return typeof schema.additionalProperties === 'object'
+      ? `Record<string, ${type(schema.additionalProperties)}>` : 'Record<string, unknown>'
     return `{ ${Object.entries(schema.properties)
       .map(
         ([key, value]) =>

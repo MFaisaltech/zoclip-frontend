@@ -5,7 +5,15 @@ import { mediaApi, type MediaSchemas } from './media-api'
 export type UploadRecord = {
   sha256: string; size: number; initiateKey: string; completeKey: string; uploadId?: string;
 }
-export type UploadProgress = { stage: 'hashing' | 'uploading' | 'validating'; bytes: number; total: number }
+export type UploadProgress = { stage: 'hashing' | 'initiating' | 'uploading' | 'finalizing'; bytes: number; total: number }
+export function uploadProgressLabel(progress: UploadProgress): string {
+  switch (progress.stage) {
+    case 'hashing': return 'Preparing your video…'
+    case 'initiating': return 'Starting your upload…'
+    case 'uploading': return 'Uploading your video…'
+    case 'finalizing': return 'Finishing your upload…'
+  }
+}
 export const uploadLimit = 4294967296 // OpenAPI hard ceiling; server may configure a lower limit.
 export function uploadStorageKey(owner: string) { return `zoclip-upload-v1:${owner}` }
 export function readUpload(storage: Pick<Storage, 'getItem'>, owner: string): UploadRecord | null {
@@ -18,6 +26,7 @@ export function readUpload(storage: Pick<Storage, 'getItem'>, owner: string): Up
   return null
 }
 export const retryableUploadError = (error: unknown) => error instanceof AuthApiError &&
+  error.code !== 'plan_unconfigured' &&
   (['network_error', 'timeout', 'upload_busy', 'upload_timeout'].includes(error.code) ||
    [408, 429, 500, 502, 503, 504].includes(error.status))
 
@@ -53,6 +62,7 @@ export async function runUpload(options: {
   if (record && (record.size !== file.size || record.sha256 !== sha256)) throw new AuthApiError(0, 'file_mismatch')
   record ??= {sha256, size: file.size, initiateKey: crypto.randomUUID(), completeKey: crypto.randomUUID()}
   save(record) // Persist BEFORE dispatch, including lost initiation acknowledgments.
+  progress({stage: 'initiating', bytes: 0, total: file.size})
   const upload = record.uploadId
     ? await retryUpload(() => api.call('upload', {params: {upload_id: record!.uploadId!}, signal}), signal)
     : await retryUpload(() => api.call('initiate', {body: {size_bytes: file.size, sha256, rights_attested: true}, key: record!.initiateKey, signal}), signal).catch(error => {
@@ -64,8 +74,10 @@ export async function runUpload(options: {
   if (upload.expected_bytes !== file.size || upload.part_bytes < 65536 || upload.part_bytes > 8388608 ||
     !Number.isSafeInteger(upload.part_bytes)) throw new AuthApiError(0, 'invalid_response')
   record = {...record, uploadId: upload.id}; save(record)
-  if (['FINALIZING', 'COMPLETE'].includes(upload.state))
+  if (['FINALIZING', 'COMPLETE'].includes(upload.state)) {
+    progress({stage: 'finalizing', bytes: file.size, total: file.size})
     return retryUpload(() => api.call('complete', {params: {upload_id: upload.id}, key: record!.completeKey, signal}), signal)
+  }
   if (Date.parse(upload.expires_at) <= Date.now()) throw new AuthApiError(409, 'upload_expired')
   if (upload.state !== 'OPEN') throw new AuthApiError(409, 'upload_expired')
   const count = Math.ceil(file.size / upload.part_bytes)
@@ -85,6 +97,6 @@ export async function runUpload(options: {
       throw new AuthApiError(0, 'invalid_response')
     bytes += part.size; progress({stage: 'uploading', bytes, total: file.size})
   }
-  progress({stage: 'validating', bytes: file.size, total: file.size})
+  progress({stage: 'finalizing', bytes: file.size, total: file.size})
   return retryUpload(() => api.call('complete', {params: {upload_id: upload.id}, key: record!.completeKey, signal}), signal)
 }

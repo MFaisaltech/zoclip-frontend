@@ -16,7 +16,7 @@ async function load(name) {
 const {Sha256, hashFile, hashBlockBytes} = await import(await load('file-hash'))
 const {createMediaApi} = await import(await load('media-api'))
 const {createAuthClient, AuthApiError} = await import(await load('auth-api'))
-const {runUpload, readUpload, uploadStorageKey, retryUpload} = await import(await load('resumable-upload'))
+const {runUpload, readUpload, uploadStorageKey, retryUpload, uploadProgressLabel} = await import(await load('resumable-upload'))
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const json = (data, status = 200) => new Response(JSON.stringify(data), {status})
 const job = {id:id(1),video_id:id(2),kind:'VALIDATE',state:'QUEUED',error_code:null,attempts:0,created_at:'2026-10-13T00:00:00Z',updated_at:'2026-10-13T00:00:00Z',stage:'QUEUED',progress_percent:null,estimated_credits:0,heartbeat_at:null,reservation_id:null}
@@ -148,4 +148,46 @@ test('definitively rejected initiation discards local resume intent, while an un
     await assert.rejects(runUpload({api,file:new Blob(['abc']),record:null,signal:controller.signal,save:record=>{saved=record},discard:()=>discarded++,progress:()=>{}}))
     assert.equal(discarded,expected);assert.ok(saved.initiateKey)
   }
+})
+
+test('100 percent checksum is followed by zero-byte initiation; a missing catalog never reports transfer or finalization', async () => {
+  const progress = [], calls = []
+  const api = {async call(name) {calls.push(name); throw new AuthApiError(503, 'plan_unconfigured')}}
+  await assert.rejects(runUpload({api, file: new Blob(['abc']), record: null,
+    signal: new AbortController().signal, save: () => {}, progress: p => progress.push(p)}), {code:'plan_unconfigured'})
+  assert.deepEqual(calls, ['initiate'])
+  assert.ok(progress.some(p => p.stage === 'hashing' && p.bytes === 3))
+  assert.deepEqual(progress.at(-1), {stage:'initiating',bytes:0,total:3})
+  assert.match(uploadProgressLabel(progress.at(-1)), /Starting your upload/)
+  assert.ok(!progress.some(p => ['uploading','finalizing'].includes(p.stage)))
+})
+
+test('confirmed bytes are distinct from an accepted finalization response', async () => {
+  const simulator = uploadSimulator(), progress = []
+  const api = {async call(name, args) {
+    if (name === 'complete') throw new AuthApiError(409, 'upload_closed')
+    return simulator.api.call(name,args)
+  }}
+  await assert.rejects(runUpload({api,file:simulator.file,record:null,
+    signal:new AbortController().signal,save:()=>{},progress:p=>progress.push(p)}), {code:'upload_closed'})
+  assert.equal(progress.at(-1).stage,'finalizing')
+  assert.match(uploadProgressLabel(progress.at(-1)), /Finishing your upload/)
+})
+
+test('private preview accepts honest unavailable pricing and never returns a redeemable quote', async () => {
+  const body = {source_seconds:26,output_count:1,edit_count:0,captions:true,reframe:true}
+  const preview = {preview_only:true,processing_enabled:false,pricing_status:'unconfigured',price_version_id:null,credits:null,request:body}
+  const calls = []
+  const client = createMediaApi({origin:'https://api.example.com',authorize:op=>op('test-csrf'),fetch:async (url,options)=>{
+    calls.push({url,options});return json(preview)
+  }})
+  const result = await client.call('quotePreview',{body})
+  assert.deepEqual(result,preview)
+  assert.equal(calls.length,1)
+  assert.equal(calls[0].url,'https://api.example.com/api/v1/jobs/quote-preview')
+  assert.equal(calls[0].options.headers['X-CSRF-Token'],'test-csrf')
+  assert.equal(calls[0].options.headers['Idempotency-Key'],undefined)
+  assert.equal('id' in result,false)
+  const bad = createMediaApi({origin:'https://api.example.com',authorize:op=>op('test-csrf'),fetch:async()=>json({...preview,processing_enabled:true})})
+  await assert.rejects(bad.call('quotePreview',{body}),{code:'invalid_response'})
 })

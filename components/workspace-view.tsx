@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from 'react'
 import MediaStudio from '@/components/media-studio'
+import BillingView from '@/components/billing-view'
+import AdminDashboard from '@/components/admin-dashboard'
 import { Highlights, ClipEditor } from '@/components/clip-workbench'
 import type { MediaSchemas } from '@/lib/media-api'
 import {
@@ -13,6 +15,7 @@ import {
   Scissors,
   UserRound,
   Zap,
+  ShieldCheck,
 } from 'lucide-react'
 import { authErrorMessage, type User } from '@/lib/auth-api'
 import { useWorkspaceResource } from '@/lib/use-workspace'
@@ -28,6 +31,7 @@ const navigation = [
   { label: 'Jobs', icon: RefreshCw },
   { label: 'Clips', icon: Clapperboard },
   { label: 'Credits & plans', icon: Zap },
+  { label: 'Admin', icon: ShieldCheck },
   { label: 'Account', icon: UserRound },
 ] as const
 export type WorkspaceSection = (typeof navigation)[number]['label']
@@ -470,7 +474,7 @@ function Plans({ resource }: { resource: Resource<'plans'> }) {
                       : 'Price awaiting approval'}
                   </p>
                   <details className="mt-3 text-xs text-[#77736e]">
-                    <summary className="cursor-pointer">Usage rules</summary>
+                    <summary className="cursor-pointer">Review plan &amp; usage limits</summary>
                     <dl className="mt-3 space-y-2">
                       {Object.entries(plan.price.rules).map(([key, value]) => (
                         <div key={key} className="flex justify-between gap-3">
@@ -497,8 +501,8 @@ function Plans({ resource }: { resource: Resource<'plans'> }) {
         </div>
       )}
       <Unavailable>
-        Plans are informational. Checkout, payments and plan changes are not
-        connected yet.
+        Merchant checkout is unavailable. Plan limits are supplied by ZoClip;
+        viewing a plan does not grant credits or change your access.
       </Unavailable>
     </ResourcePanel>
   )
@@ -590,7 +594,7 @@ export default function Workspace({
   function acceptedJob(job: MediaSchemas['JobView']) { setSelectedJob(job.id); refreshMedia() }
   function showHighlights(id: string) {setHighlightsVideo(id); setActive('Clips')}
   function editClip(id: string) {setEditingClip(id); setActive('Clips')}
-  const nav = navigation.map(({ label, icon: Icon }) => (
+  const nav = navigation.filter(({label}) => label !== 'Admin' || user.role === 'admin').map(({ label, icon: Icon }) => (
     <button
       key={label}
       onClick={() => setActive(label)}
@@ -734,18 +738,9 @@ export default function Workspace({
             </>
           )}
           {active === 'Credits & plans' && (
-            <>
-              <Heading title="Credits & plans">
-                Your balance, ledger, entitlements and the current plan catalog.
-              </Heading>
-              <div className="space-y-6">
-                <Wallet resource={wallet} />
-                <Transactions resource={transactions} />
-                <Entitlements resource={entitlements} plans={plans} />
-                <Plans resource={plans} />
-              </div>
-            </>
+            <BillingView key={user.id} wallet={<Wallet resource={wallet}/>} ledger={<Transactions resource={transactions}/>} access={<Entitlements resource={entitlements} plans={plans}/>} catalog={<Plans resource={plans}/>}/>
           )}
+          {active === 'Admin' && <AdminDashboard user={user} onChanged={() => {void plans.refresh(); void wallet.refresh(); void transactions.refresh(); void entitlements.refresh()}}/>}
           {active === 'Account' && (
             <>
               <Heading title="Your account">

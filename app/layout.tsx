@@ -42,7 +42,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ENABLE_ANALYTICS === 'true' && process.env.NEXT_PUBLIC_PRIVATE_STAGING !== 'true' && <Analytics />}
       </body>
     </html>
   )

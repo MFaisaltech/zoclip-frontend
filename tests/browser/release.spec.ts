@@ -1,0 +1,81 @@
+import { expect, test, type Page } from '@playwright/test'
+import { readFileSync, mkdirSync, statSync } from 'node:fs'
+import { dirname, resolve, sep } from 'node:path'
+
+const root=resolve('../backend/var/phase8-auth')
+const statePath=resolve(process.env.ZOCLIP_AUTH_TEST_STATE||'missing-state')
+if(!statePath.startsWith(root+sep)||!statePath.endsWith(`${sep}state.json`))throw Error('Disposable test state required')
+const state=JSON.parse(readFileSync(statePath,'utf8')) as {api_origin:string}
+if(!/^http:\/\/localhost:\d+$/.test(state.api_origin))throw Error('Loopback API required')
+const fixture=JSON.parse(readFileSync(resolve(dirname(statePath),'media-fixture.json'),'utf8')) as {password:string;users:Record<'alice'|'bob',{email:string}>}
+const evidence=resolve('../backend/var/release-evidence')
+mkdirSync(evidence,{recursive:true})
+async function login(page:Page,name:'alice'|'bob'='alice') {
+  await page.goto('/',{waitUntil:'domcontentloaded'})
+  await page.getByRole('button',{name:'Sign in',exact:true}).first().click()
+  await page.getByLabel('Email address').fill(fixture.users[name].email)
+  await page.getByLabel('Password',{exact:true}).fill(fixture.password)
+  await page.getByRole('button',{name:'Sign in',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Turn your videos into short clips.'})).toBeVisible()
+}
+async function upload(page:Page) {
+  await page.getByRole('button',{name:'Upload a video',exact:true}).first().click()
+  const form=page.getByRole('region',{name:'Add video'})
+  await form.getByLabel('I own this video',{exact:false}).check()
+  await form.getByLabel('Video file',{exact:true}).setInputFiles(resolve('../backend/tests/fixtures/source.mp4'))
+  await form.getByRole('button',{name:'Upload video',exact:true}).click()
+  const generation=page.getByRole('region',{name:'Generate clips'})
+  await expect(generation.getByText('Your video is ready.',{exact:true})).toBeVisible({timeout:45000})
+  await expect(generation).toContainText('Create up to 1 clip · 1 credits')
+  return generation
+}
+test('homepage renders with API unreachable and has working primary CTA',async({page})=>{
+  await page.route('**/api/v1/me',route=>route.abort())
+  await page.goto('/',{waitUntil:'domcontentloaded'})
+  await expect(page.getByRole('heading',{name:/Long videos/ })).toBeVisible()
+  await page.screenshot({path:resolve(evidence,'homepage-desktop.png'),fullPage:false})
+  await page.getByRole('button',{name:'Start clipping',exact:true}).first().click()
+  await expect(page.locator('p[role=alert]')).toBeVisible()
+  await page.getByRole('button',{name:'Try again',exact:true}).click()
+})
+test('fresh login → upload → quoted automatic generation → browser preview → playable MP4 download',async({page})=>{
+  const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message))
+  await login(page)
+  await page.screenshot({path:resolve(evidence,'workspace-desktop.png'),fullPage:false})
+  const generation=await upload(page)
+  await expect(generation.getByRole('button',{name:'Generate clips — 1 credits'})).toBeEnabled()
+  await generation.getByRole('button',{name:'Generate clips — 1 credits'}).click()
+  await expect(page.getByRole('region',{name:'Video progress'}).getByRole('status')).toHaveText('Your clips are ready.',{timeout:60000})
+  await page.getByRole('button',{name:'Preview your clips'}).click()
+  await page.getByRole('button',{name:'Preview clip',exact:true}).first().click()
+  const video=page.locator('video').first()
+  await expect(video).toBeVisible()
+  await expect.poll(()=>video.evaluate(node=>(node as HTMLVideoElement).readyState)).toBeGreaterThanOrEqual(2)
+  expect(await video.evaluate(node=>(node as HTMLVideoElement).duration)).toBeGreaterThan(2)
+  await video.evaluate(node=>(node as HTMLVideoElement).play())
+  await expect.poll(()=>video.evaluate(node=>(node as HTMLVideoElement).currentTime)).toBeGreaterThan(0)
+  await page.screenshot({path:resolve(evidence,'clip-preview-desktop.png'),fullPage:false})
+  const download=page.waitForEvent('download')
+  await page.getByRole('button',{name:'Download',exact:true}).first().click()
+  const output=await download
+  await output.saveAs(resolve(evidence,'browser-downloaded-clip.mp4'))
+  expect(statSync(resolve(evidence,'browser-downloaded-clip.mp4')).size).toBeGreaterThan(1000)
+  expect(errors).toEqual([])
+  await expect(page.locator('main')).not.toContainText(/Deepgram|Gemini|checksum|reservation|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}/i)
+})
+test('mobile upload, insufficient credits, honest billing and account navigation',async({page})=>{
+  await page.setViewportSize({width:390,height:844})
+  await login(page,'bob')
+  const generation=await upload(page)
+  await expect(generation.getByRole('button',{name:'Generate clips — 1 credits'})).toBeDisabled()
+  await expect(generation).toContainText('You need 1 more credits')
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true)
+  await page.screenshot({path:resolve(evidence,'workspace-mobile.png'),fullPage:false})
+  const nav=page.getByRole('navigation',{name:'Mobile workspace',exact:true})
+  await nav.getByRole('button',{name:'Credits & plans',exact:true}).click()
+  await expect(page.getByText('Credit purchases are coming soon',{exact:true})).toBeVisible()
+  await nav.getByRole('button',{name:'Account',exact:true}).click()
+  await expect(page.getByRole('heading',{name:'Your account'})).toBeVisible()
+  await page.getByRole('button',{name:'Log out',exact:true}).click()
+  await expect(page.getByRole('button',{name:'Start clipping',exact:true}).first()).toBeVisible()
+})

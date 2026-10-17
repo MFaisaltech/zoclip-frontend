@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AuthApiError } from '@/lib/auth-api'
 import { mediaApi, mediaErrorMessage, type MediaSchemas } from '@/lib/media-api'
 import { clipOptions, captionWords, timestamp, validPreferences, type Preferences } from '@/lib/clip-editor'
@@ -13,13 +13,13 @@ function useTask() {
   const [busy, setBusy] = useState(false), [error, setError] = useState<unknown>(null)
   const active = useRef<AbortController | null>(null)
   useEffect(() => () => active.current?.abort(), [])
-  async function run(work: (signal: AbortSignal) => Promise<void>) {
+  const run = useCallback(async (work: (signal: AbortSignal) => Promise<void>) => {
     if (active.current) return
     const controller = new AbortController(); active.current = controller; setBusy(true); setError(null)
     try { await work(controller.signal) }
     catch (cause) {if (!controller.signal.aborted) setError(cause)}
     finally {if (active.current === controller) {active.current = null; if (!controller.signal.aborted) setBusy(false)}}
-  }
+  }, [])
   return {busy, error, run}
 }
 function ErrorText({error}: {error: unknown}) {return error ? <p role="alert" className="my-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">{mediaErrorMessage(error)}</p> : null}
@@ -109,14 +109,16 @@ export function ClipEditor({owner, clipId, onChanged}: {owner: string; clipId: s
     try {const saved=JSON.parse(sessionStorage.getItem(intentKey)??'null'); if(saved && Number.isInteger(saved.revision) && saved.revision>=1 && saved.revision<=101 && /^[\w.:-]{1,128}$/.test(saved.key) && (!saved.quote_id || /^[a-f0-9-]{36}$/i.test(saved.quote_id)))setRenderIntent(saved)}catch { /* No pending request. */ }
     return () => {if(urlRef.current)URL.revokeObjectURL(urlRef.current)}
   },[intentKey])
-  async function load(signal:AbortSignal) {
+  const load = useCallback(async (signal:AbortSignal) => {
     const next=await mediaApi.call('clip',{params:{clip_id:clipId},signal})
     const source=await mediaApi.call('video',{params:{video_id:next.video_id},signal})
     const durationMs=source.metadata_json.duration_ms
     if(typeof durationMs!=='number'||!Number.isSafeInteger(durationMs))throw new AuthApiError(0,'invalid_response')
-    setClip(next);setPrefs(structuredClone(next.preferences));setDuration(durationMs);setUncertain(false);setPaidQuote(null);setMessage('Server revision loaded. Unsaved local edits were replaced.')
+    setClip(next);setPrefs(structuredClone(next.preferences));setDuration(durationMs);setUncertain(false);setPaidQuote(null);setMessage('Clip loaded.')
     setOutputs(await mediaApi.call('outputs',{params:{clip_id:clipId},signal}))
-  }
+  }, [clipId])
+  const runTask = task.run
+  useEffect(() => { void runTask(load) }, [load, runTask])
   const update = <K extends keyof Preferences>(name:K,value:Preferences[K]) => {setPrefs(p => p && {...p,[name]:value});setPaidQuote(null)}
   async function render(signal:AbortSignal, quoteId?:string) {
     if(!clip)return
@@ -131,61 +133,61 @@ export function ClipEditor({owner, clipId, onChanged}: {owner: string; clipId: s
     }
   }
   return <section aria-label="Clip editor" className={panel}>
-    <h2 className="text-xl font-semibold">Clip editor & exports</h2><p className="my-2 break-all text-xs text-[#8a857f]">{clipId}</p>
-    <button className={button} disabled={task.busy} onClick={() => {void task.run(load)}}>Reload server revision</button>
+    <h2 className="text-xl font-semibold">Edit your clip</h2>
+    <button className={button} disabled={task.busy} onClick={() => {void task.run(load)}}>Reload clip</button>
     <ErrorText error={task.error}/>
     {message && <p role="status" className="my-3 text-sm text-[#6558c8]">{message}</p>}
     {clip && prefs && <>
-      <p className="my-4 text-sm">Revision {clip.revision} · Source {timestamp(duration/1000)} · Output 9:16 · 720×1280 · MP4 (H.264/AAC)</p>
+      <p className="my-4 text-sm">Source {timestamp(duration/1000)} · Vertical MP4</p>
       <fieldset disabled={task.busy || !!renderIntent} className="grid min-w-0 gap-4 sm:grid-cols-2">
         <label htmlFor="clip-title" className="text-sm sm:col-span-2">Title<input id="clip-title" className={input} maxLength={160} value={prefs.title??''} onChange={e=>update('title',e.target.value)}/></label>
-        <label htmlFor="trim-start" className="text-sm">Start (absolute source milliseconds)<input id="trim-start" className={input} type="number" min={0} max={duration} value={prefs.start_ms} onChange={e=>update('start_ms',Number(e.target.value))}/></label>
-        <label htmlFor="trim-end" className="text-sm">End (absolute source milliseconds)<input id="trim-end" className={input} type="number" min={250} max={duration} value={prefs.end_ms} onChange={e=>update('end_ms',Number(e.target.value))}/></label>
+        <label htmlFor="trim-start" className="text-sm">Start (seconds)<input id="trim-start" className={input} type="number" min={0} max={duration/1000} step={0.1} value={prefs.start_ms/1000} onChange={e=>update('start_ms',Math.round(Number(e.target.value)*1000))}/></label>
+        <label htmlFor="trim-end" className="text-sm">End (seconds)<input id="trim-end" className={input} type="number" min={0.25} max={duration/1000} step={0.1} value={prefs.end_ms/1000} onChange={e=>update('end_ms',Math.round(Number(e.target.value)*1000))}/></label>
         <label htmlFor="clip-hashtags" className="text-sm sm:col-span-2">Hashtags (comma separated, at most 10)<input id="clip-hashtags" className={input} value={(prefs.hashtags??[]).join(',')} onChange={e=>update('hashtags',e.target.value ? e.target.value.split(',') : [])}/></label>
-        <label htmlFor="clip-captions" className="flex items-center gap-2 text-sm"><input id="clip-captions" type="checkbox" checked={prefs.captions??true} onChange={e=>update('captions',e.target.checked)}/>Burn in captions</label>
-        {(['preset','font','placement','frame'] as const).map(name=><div key={name} className="text-sm"><label htmlFor={`clip-${name}`}>{({preset:'Caption preset',font:'Caption font',placement:'Caption placement',frame:'Framing mode'})[name]}</label><select id={`clip-${name}`} className={input} value={prefs[name]} onChange={e=>update(name,e.target.value as Preferences[typeof name])}>{clipOptions[name].map(value=><option key={value} value={value}>{value}</option>)}</select></div>)}
+        <label htmlFor="clip-captions" className="flex items-center gap-2 text-sm"><input id="clip-captions" type="checkbox" checked={prefs.captions??true} onChange={e=>update('captions',e.target.checked)}/>Show captions</label>
+        {(['preset','font','placement','frame'] as const).map(name=><div key={name} className="text-sm"><label htmlFor={`clip-${name}`}>{({preset:'Caption style',font:'Caption font',placement:'Caption placement',frame:'Framing'})[name]}</label><select id={`clip-${name}`} className={input} value={prefs[name]} onChange={e=>update(name,e.target.value as Preferences[typeof name])}>{clipOptions[name].map(value=><option key={value} value={value}>{value}</option>)}</select></div>)}
         {prefs.frame==='manual' && (['focal_x','focal_y'] as const).map(name=><label key={name} htmlFor={name} className="text-sm">{name} (0–1000)<input id={name} className={input} type="number" min={0} max={1000} value={prefs[name]} onChange={e=>update(name,Number(e.target.value))}/></label>)}
       </fieldset>
-      <p className="my-3 text-xs text-[#8a857f]">Trim duration: {prefs.end_ms-prefs.start_ms} ms (250–90,000). Track uses sampled face detection with a center fallback; pad preserves the source inside the vertical frame. Caption presets map directly to backend values.</p>
+      <p className="my-3 text-xs text-[#8a857f]">Clip length: {((prefs.end_ms-prefs.start_ms)/1000).toFixed(1)} seconds. Keep it within 90 seconds. Choose padding to keep the whole picture visible.</p>
       <div className="my-3 flex flex-wrap gap-2">
-        <button className={button} disabled={task.busy || !!renderIntent} onClick={()=>{void task.run(async signal=>{const t=await mediaApi.call('transcript',{params:{video_id:clip.video_id},query:{job_id:clip.job_id},signal});update('words',captionWords(t,prefs))})}}>Edit transcript caption words</button>
-        <button className={button} disabled={task.busy || !!renderIntent} onClick={()=>update('words',null)}>Use original transcript</button>
-        <button className={button} disabled={task.busy || !!renderIntent} onClick={()=>update('words',[])}>Clear caption words</button>
+        <button className={button} disabled={task.busy || !!renderIntent} onClick={()=>{void task.run(async signal=>{const t=await mediaApi.call('transcript',{params:{video_id:clip.video_id},query:{job_id:clip.job_id},signal});update('words',captionWords(t,prefs))})}}>Edit caption text</button>
+        <button className={button} disabled={task.busy || !!renderIntent} onClick={()=>update('words',null)}>Restore original captions</button>
+        <button className={button} disabled={task.busy || !!renderIntent} onClick={()=>update('words',[])}>Clear captions</button>
       </div>
       {prefs.words && <div className="max-h-80 space-y-3 overflow-auto rounded-xl border border-[#eeeae5] p-3" aria-label="Caption word edits">{prefs.words.slice(0,1000).map((word,i)=><div key={i} className="grid gap-2 sm:grid-cols-3">{(['text','start_ms','end_ms'] as const).map(name=><label key={name} htmlFor={`word-${i}-${name}`} className="text-xs">Word {i+1} {name}<input id={`word-${i}-${name}`} className={input} type={name==='text'?'text':'number'} maxLength={name==='text'?80:undefined} value={word[name]} disabled={task.busy || !!renderIntent} onChange={e=>update('words',prefs.words!.map((row,n)=>n===i?{...row,[name]:name==='text'?e.target.value:Number(e.target.value)}:row))}/></label>)}</div>)}</div>}
-      {!validPreferences(prefs,duration) && <p role="alert" className="my-3 text-sm text-red-800">Check trim length/source bounds, hashtag limits and caption words. Words must be nonempty, ordered, nonoverlapping and within the trim (maximum 1000).</p>}
+      {!validPreferences(prefs,duration) && <p role="alert" className="my-3 text-sm text-red-800">Check your clip's start and end times, hashtags, and captions. Caption words need valid timings within the clip.</p>}
       <button className={button} disabled={task.busy || uncertain || !!renderIntent || !validPreferences(prefs,duration)} onClick={()=>{void task.run(async signal=>{
-        try {const saved=await mediaApi.call('editClip',{params:{clip_id:clipId},body:prefs,revision:clip.revision,signal});setClip(saved);setPrefs(structuredClone(saved.preferences));setMessage(`Saved revision ${saved.revision}. Render it to create a new MP4.`);onChanged()}
+        try {const saved=await mediaApi.call('editClip',{params:{clip_id:clipId},body:prefs,revision:clip.revision,signal});setClip(saved);setPrefs(structuredClone(saved.preferences));setMessage(`Changes saved. Create an updated MP4 below.`);onChanged()}
         catch(error){setUncertain(true);throw error}
-      })}}>Save new revision</button>
-      {uncertain && <p className="my-3 text-sm">Your local edits are still visible. Reloading the server revision replaces them. Save will remain disabled until you reload to reconcile the result.</p>}
+      })}}>Save changes</button>
+      {uncertain && <p className="my-3 text-sm">We couldn't confirm whether your changes were saved. Your edits are still visible. Reload the clip to check the saved version before editing again.</p>}
       <div className="my-5 border-t border-[#eeeae5] pt-4">
-        <p className="mb-3 text-sm">Re-render only a saved revision after the initial selection has completed. Use a prepaid edit first; the server will request a quote if one is required. Unsaved changes are not rendered.</p>
-        <button className={button} disabled={task.busy || uncertain || JSON.stringify(prefs)!==JSON.stringify(clip.preferences)} onClick={()=>{void task.run(signal=>render(signal))}}>{renderIntent?'Recover confirmed render request':'Request prepaid re-render'}</button>
+        <p className="mb-3 text-sm">Save your changes first, then create an updated MP4. If your included edits are used, review the price before you confirm.</p>
+        <button className={button} disabled={task.busy || uncertain || JSON.stringify(prefs)!==JSON.stringify(clip.preferences)} onClick={()=>{void task.run(signal=>render(signal))}}>{renderIntent?'Check my export request':'Create updated MP4'}</button>
         <button className={`${button} ml-2`} disabled={task.busy || !!renderIntent || JSON.stringify(prefs)!==JSON.stringify(clip.preferences)} onClick={()=>{void task.run(async signal=>{
           const source=await mediaApi.call('video',{params:{video_id:clip.video_id},signal})
           const seconds=source.metadata_json.duration_seconds
           if(typeof seconds!=='number'||!Number.isSafeInteger(seconds))throw new AuthApiError(0,'invalid_response')
           setPaidQuote(await mediaApi.call('quote',{body:{source_seconds:seconds,output_count:1,edit_count:0,captions:prefs.captions??true,reframe:prefs.frame!=='pad'},key:crypto.randomUUID(),signal}))
-        })}}>Get paid export quote</button>
-        {paidQuote && <div className="mt-3 rounded-xl bg-[#f2efff] p-3 text-sm"><p>Reserve {paidQuote.credits} credits · Expires {new Date(paidQuote.expires_at).toLocaleString()}. This source-based quote includes the source-minute charge.</p><button className={`${button} mt-3`} disabled={task.busy} onClick={()=>{void task.run(async signal=>{if(Date.parse(paidQuote.expires_at)<=Date.now())throw new AuthApiError(409,'quote_expired');await render(signal,paidQuote.id)})}}>Confirm paid export: {paidQuote.credits} credits</button></div>}
+        })}}>Check export price</button>
+        {paidQuote && <div className="mt-3 rounded-xl bg-[#f2efff] p-3 text-sm"><p>Your updated clip costs {paidQuote.credits} credits. This price is valid until {new Date(paidQuote.expires_at).toLocaleString()}.</p><button className={`${button} mt-3`} disabled={task.busy} onClick={()=>{void task.run(async signal=>{if(Date.parse(paidQuote.expires_at)<=Date.now())throw new AuthApiError(409,'quote_expired');await render(signal,paidQuote.id)})}}>Create updated MP4: {paidQuote.credits} credits</button></div>}
       </div>
-      <button className={button} disabled={task.busy} onClick={()=>{void task.run(async signal=>{setOutputs(await mediaApi.call('outputs',{params:{clip_id:clipId},signal}))})}}>Refresh exports</button>
-      {!outputs.length && <p className="my-3 text-sm">No export has been requested for this clip.</p>}
+      <button className={button} disabled={task.busy} onClick={()=>{void task.run(async signal=>{setOutputs(await mediaApi.call('outputs',{params:{clip_id:clipId},signal}))})}}>Refresh downloads</button>
+      {!outputs.length && <p className="my-3 text-sm">No download is available for this clip yet.</p>}
       <div className="mt-3 space-y-3">{outputs.map(output=><article key={output.id} className="rounded-xl border border-[#eeeae5] p-3 text-sm">
-        <p>Revision {output.revision} · {output.state}</p><p className="my-2 break-words text-xs">{['width','height','duration_ms','size_bytes','frame_mode','video_codec'].filter(key=>output.metadata[key]!==undefined).map(key=>`${key}: ${String(output.metadata[key])}`).join(' · ')}</p>
-        <button className={button} onClick={()=>setRenderJob(output.job_id)}>Track export job</button>
+        <p>Version {output.revision} · {output.state==='COMPLETE'?'Ready to download':output.state==='FAILED'?'Could not create this clip':'Preparing your clip…'}</p>
+        <button className={button} onClick={()=>setRenderJob(output.job_id)}>View progress</button>
         <button className={`${button} ml-2`} disabled={task.busy || output.state!=='COMPLETE'} onClick={()=>{void task.run(async signal=>{
           const job=await mediaApi.call('job',{params:{job_id:output.job_id},signal})
           if(job.state!=='COMPLETED')throw new AuthApiError(409,'render_busy')
           const blob=await mediaApi.call('download',{params:{clip_id:clipId},query:{revision:output.revision},signal})
           if(urlRef.current)URL.revokeObjectURL(urlRef.current)
           const url=URL.createObjectURL(blob);urlRef.current=url;setDownloadUrl(url);setDownloadRevision(output.revision)
-          const anchor=document.createElement('a');anchor.href=url;anchor.download=`${clipId}-r${output.revision}.mp4`;anchor.click()
-          setMessage(`MP4 received for revision ${output.revision}. Browser download requested.`)
-        })}}>Download revision {output.revision} MP4</button>
+          const anchor=document.createElement('a');anchor.href=url;anchor.download=`${(clip.preferences.title||'ZoClip').replace(/[^a-zA-Z0-9 _-]/g,'').slice(0,80)||'ZoClip'}-v${output.revision}.mp4`;anchor.click()
+          setMessage('Your MP4 is ready. Check your downloads.')
+        })}}>Download MP4</button>
       </article>)}</div>
-      {downloadUrl && <><p className="mt-4 text-xs text-[#77736e]">Downloaded revision {downloadRevision} preview. Unsaved edits are not reflected here.</p><video aria-label="Downloaded MP4 preview" className="mt-2 max-h-[480px] w-full rounded-xl bg-black" src={downloadUrl} controls preload="metadata"><track kind="captions"/>Your browser cannot play this MP4.</video></>}
+      {downloadUrl && <><p className="mt-4 text-xs text-[#77736e]">Preview of version {downloadRevision}. Save your edits and create an updated MP4 to see changes here.</p><video aria-label="Downloaded MP4 preview" className="mt-2 max-h-[480px] w-full rounded-xl bg-black" src={downloadUrl} controls preload="metadata"><track kind="captions"/>Your browser cannot play this MP4.</video></>}
     </>}
     {renderJob && <div className="mt-5"><JobMonitor key={renderJob} jobId={renderJob} onChanged={onChanged}/></div>}
   </section>

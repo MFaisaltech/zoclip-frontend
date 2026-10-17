@@ -8,7 +8,7 @@ const raw = await readFile(source, 'utf8')
 const api = JSON.parse(raw)
 const selected = [
   ['get', '/api/v1/auth/csrf'], ['get', '/api/v1/me'],
-  ...['register', 'verify-email', 'login', 'logout', 'session/rotate', 'password/forgot', 'password/reset']
+  ...['register', 'verify-email', 'login', 'logout', 'session/rotate', 'password/forgot', 'password/reset', 'invite/accept']
     .map((path) => ['post', `/api/v1/auth/${path}`]),
 ]
 const required = new Set(['Problem'])

@@ -29,7 +29,7 @@ type Schema = {
   items?: Schema
   properties?: Readonly<Record<string, Schema>>
   required?: readonly string[]
-  additionalProperties?: boolean
+  additionalProperties?: boolean | Schema
 }
 export function matches(schema: Schema, value: unknown, definitions: Readonly<Record<string, Schema>> = workspaceDefinitions): boolean {
   if (schema.$ref) {
@@ -86,6 +86,10 @@ export function matches(schema: Schema, value: unknown, definitions: Readonly<Re
           ([key, property]) =>
             !Object.hasOwn(object, key) || matches(property, object[key], definitions),
         ) &&
+        (typeof schema.additionalProperties !== 'object' || Object.entries(object).every(
+          ([key, value]) => Object.hasOwn(schema.properties ?? {}, key) ||
+            matches(schema.additionalProperties as Schema, value, definitions),
+        )) &&
         (schema.additionalProperties !== false ||
           Object.keys(object).every((key) =>
             Object.hasOwn(schema.properties ?? {}, key),

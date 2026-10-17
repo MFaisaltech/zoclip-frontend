@@ -8,51 +8,57 @@ const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
 export function mediaErrorMessage(error: unknown): string {
   if (!(error instanceof AuthApiError)) return 'Unable to finish. Retry to check the server and continue.'
   const messages: Record<string, string> = {
-    insufficient_credits: 'You do not have enough available credits. No new job was started.',
-    revision_conflict: 'This clip changed in another request. Your edits are preserved locally. Reload the server revision before saving again.',
-    render_busy: 'A render is active. Wait for it to finish before editing or rendering again.',
-    export_limit: 'The reserved output or edit quota has been reached.',
-    edit_limit: 'The edit allowance has been reached.',
-    quote_required: 'The prepaid edit allowance is exhausted. Review a fresh quote before reserving more credits.',
-    feature_not_reserved: 'This feature was not included in the original quote. Use the originally reserved caption and framing options.',
-    already_rendered: 'This revision already has an export request. Check its status; make a new revision for another attempt.',
-    selection_closed: 'This job already has an approved selection or is no longer available for selection.',
-    invalid_trim: 'Trim must stay within the validated source duration.',
-    invalid_captions: 'Caption words must be ordered, nonoverlapping and inside the trim.',
-    transcript_unavailable: 'The transcript is not available for this job yet.',
-    quote_expired: 'This quote expired. Request a fresh quote and review it again.',
-    quote_stale: 'Pricing changed. Request a fresh quote and review it again.',
-    unsupported_source: 'This URL is unsupported. Use a direct HTTPS MP4 or WebM URL on a host approved by ZoClip.',
-    unsafe_source: 'This URL is not permitted by the secure importer.',
-    upload_expired: 'This upload expired. Cancel it and start a new upload.',
-    upload_closed: 'This upload is closed or expired. Check your jobs for validation, or cancel it before starting again.',
-    source_not_ready: 'This source is not ready for processing. Wait for validation or select a retained, validated video.',
-    storage_unavailable: 'Browser storage is unavailable. Enable storage for ZoClip to preserve resumable requests and confirmed credit reservations.',
-    integrity_failed: 'The uploaded bytes did not match their checksum. Reselect the original file and retry.',
-    file_mismatch: 'Reselect the exact original file. Its size or SHA-256 does not match this upload.',
-    duration_exceeded: 'The video exceeds the 120-minute limit.',
-    plan_duration_exceeded: 'The video exceeds your plan duration limit.',
-    plan_limit: 'Your requested video or output count exceeds your plan limits.',
-    ingestion_limit: 'The upload limit has been reached. Finish or cancel an existing upload first.',
-    processing_limit: 'You already have an active processing job. Finish or cancel it first.',
-    concurrency_limit: 'Your plan has reached its concurrent job limit.',
-    insufficient_capacity: 'Media storage capacity is temporarily unavailable. Try again later.',
-    plan_unconfigured: 'Video processing is unavailable until your plan is configured.',
-    spending_disabled: 'Processing is disabled by the server cost controls.',
-    processing_unavailable: 'The processing engine is unavailable. Your job is waiting; you can cancel its credit hold.',
-    not_found: 'This resource is unavailable, expired, deleted, or belongs to another account.',
+    insufficient_credits: 'You need more credits to create these clips. No new attempt was started.',
+    revision_conflict: 'This clip has changed. Reload it before saving your edits.',
+    render_busy: 'Your clip is being created. Wait for it to finish before editing again.',
+    export_limit: 'You’ve reached the clip allowance for this video.',
+    edit_limit: 'You’ve used the included edits for this video.',
+    quote_required: 'Review the price for another export before you confirm.',
+    feature_not_reserved: 'This option wasn’t included in your price. Keep your original caption and framing options.',
+    already_rendered: 'This version is already being created. Check your clips for its progress.',
+    selection_closed: 'These clips are already being created. Check your clips for their progress.',
+    invalid_trim: 'Choose start and end times within your video.',
+    invalid_captions: 'Check that your caption timings stay in order and within the clip.',
+    transcript_unavailable: 'Captions aren’t available for this video yet.',
+    quote_expired: 'Your price has expired. Refresh it before creating clips.',
+    quote_stale: 'Pricing has changed. Refresh your price before creating clips.',
+    unsupported_source: 'This link isn’t supported. Download the video and upload the file instead.',
+    unsafe_source: 'We can’t import this link. Upload the video file instead.',
+    upload_expired: 'Your saved upload has expired. Start a new upload.',
+    upload_closed: 'This upload has finished or expired. Check your videos before starting again.',
+    source_not_ready: 'We’re still preparing this video. Please check again shortly.',
+    storage_unavailable: 'Allow browser storage for ZoClip so you can resume uploads and recover requests.',
+    integrity_failed: 'The transfer was interrupted. Choose the original file and try again.',
+    file_mismatch: 'Choose the same original file to resume this upload.',
+    duration_exceeded: 'Choose a video shorter than 2 hours.',
+    plan_duration_exceeded: 'This video is longer than your account allows. Try a shorter video.',
+    plan_limit: 'Choose a shorter video or fewer clips to stay within your account limits.',
+    ingestion_limit: 'Finish or cancel an existing upload before adding another.',
+    processing_limit: 'Wait for your current clips to finish, or cancel that attempt.',
+    concurrency_limit: 'Wait for your current clips to finish before starting another video.',
+    insufficient_capacity: 'ZoClip is busy. Please try again later.',
+    plan_unconfigured: 'Clip generation isn’t available for your account yet. Please contact support.',
+    plan_unavailable: 'Your plan is currently unavailable. Please contact support.',
+    spending_disabled: 'Clip generation is temporarily paused. Please try again later.',
+    staging_spending_disabled: 'Clip generation is paused during private testing.',
+    budget_exceeded: 'Clip generation is temporarily at capacity. Please try again later.',
+    usage_limit: 'You’ve reached your account’s usage limit. Please try again after it resets.',
+    processing_unavailable: 'Clip generation is temporarily unavailable. You can cancel this attempt.',
+    no_speech: 'We couldn’t find speech in this video. Try a video with clear spoken audio. Your credits were returned.',
+    no_suggestions: 'We couldn’t find a suitable moment in this video. Try a longer conversation. Your credits were returned.',
+    not_found: 'This item is no longer available. Refresh your workspace.',
     authentication_required: 'Your session expired. Sign in again to continue.',
-    csrf_failed: 'Your security session changed. Retry to obtain a fresh security token.',
-    network_error: 'Connection interrupted. Retry safely using the same request and confirmed upload parts.',
-    timeout: 'The request timed out. Retry safely to recover the server result.',
-    invalid_response: 'The server returned an unexpected response. Retry to check its result.',
+    csrf_failed: 'Your session changed. Please try again.',
+    network_error: 'Connection interrupted. Try again to continue where you left off.',
+    timeout: 'This is taking longer than expected. Try again to check the result.',
+    invalid_response: 'We couldn’t check the result. Please refresh and try again.',
   }
   if (messages[error.code]) return messages[error.code]
-  if (error.status === 413) return 'The file or chunk exceeds the server upload limit.'
-  if (error.status === 429) return 'ZoClip has reached a request or queue limit. Wait before retrying.'
+  if (error.status === 413) return 'This file is too large. Try a smaller video.'
+  if (error.status === 429) return 'ZoClip is busy. Wait a moment and try again.'
   if (error.status === 422) return 'The video, URL or requested settings are invalid. Check them before retrying.'
   if (error.status >= 500) return 'ZoClip is temporarily unavailable. Retry to recover your request.'
-  return `The request could not finish (${error.code}).`
+  return 'We couldn’t finish this request. Please try again.'
 }
 
 export function createMediaApi(options: {
@@ -83,7 +89,10 @@ export function createMediaApi(options: {
       const query = new URLSearchParams()
       for (const [key, value] of Object.entries(args.query ?? {})) {
         if (!(descriptor.queries as readonly string[]).includes(key) ||
-          (key.endsWith('_id') ? !uuid.test(String(value)) : !Number.isSafeInteger(Number(value)) || Number(value) < 1))
+          (key === 'search' ? typeof value !== 'string' || value.length > 100 :
+            key.endsWith('_id') || ['cursor', 'before'].includes(key) ? !uuid.test(String(value)) :
+              !Number.isSafeInteger(Number(value)) || Number(value) < 1 ||
+                (key === 'limit' && Number(value) > 100)))
           throw new AuthApiError(0, 'invalid_request')
         query.set(key, String(value))
       }
@@ -144,6 +153,18 @@ export function createMediaApi(options: {
             if (job.attempts < 0 || (job.progress_percent !== null && (job.progress_percent < 0 || job.progress_percent > 100)) ||
               (job.estimated_credits !== null && job.estimated_credits < 0)) throw new AuthApiError(0, 'invalid_response')
           }
+          if (name === 'billingOverview' || name === 'customerBilling') {
+            const billing = data as MediaOperations['billingOverview']['response']
+            if ([billing.daily_used_credits, billing.monthly_used_credits, billing.held_credits,
+              billing.held_reservations, billing.settled_credits, billing.released_credits].some(value => value < 0))
+              throw new AuthApiError(0, 'invalid_response')
+          }
+          if (name === 'customers' && (data as MediaOperations['customers']['response']).items.some(
+            customer => customer.available_credits < 0 || customer.reserved_credits < 0))
+            throw new AuthApiError(0, 'invalid_response')
+          if (name === 'reservations' && (data as MediaOperations['reservations']['response']).items.some(
+            reservation => reservation.credits < 1 || !['HELD', 'SETTLED', 'RELEASED'].includes(reservation.state)))
+            throw new AuthApiError(0, 'invalid_response')
           return data as MediaOperations[K]['response']
         } catch (error) {
           args.signal?.throwIfAborted()

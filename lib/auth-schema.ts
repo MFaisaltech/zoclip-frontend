@@ -1,5 +1,5 @@
 // Generated from backend/docs/openapi.json. Do not edit.
-// Source SHA-256: 533c20db9917b055599add95c334a04a901953ba6f7b2ae8815cf452ade626fe
+// Source SHA-256: b7deca3dfd32dce14ad9c43d69d26cc9a72147d9a452dccc2227102834196c64
 export interface AuthSchemas {
   "Problem": { "type": string; "title": string; "status": number; "code": string; "detail": string; "instance": string; "request_id": string }
   "CsrfResponse": { "csrf_token": string }
@@ -10,6 +10,7 @@ export interface AuthSchemas {
   "LoginResponse": { "user": AuthSchemas["Me"]; "csrf_token": string }
   "EmailInput": { "email": string }
   "ResetInput": { "token": string; "password": string }
+  "InviteInput": { "token": string; "password": string }
 }
 
 export interface AuthOperations {
@@ -22,6 +23,7 @@ export interface AuthOperations {
   "POST /api/v1/auth/session/rotate": { request: never; response: AuthSchemas["CsrfResponse"] }
   "POST /api/v1/auth/password/forgot": { request: AuthSchemas["EmailInput"]; response: AuthSchemas["Message"] }
   "POST /api/v1/auth/password/reset": { request: AuthSchemas["ResetInput"]; response: AuthSchemas["Message"] }
+  "POST /api/v1/auth/invite/accept": { request: AuthSchemas["InviteInput"]; response: AuthSchemas["Message"] }
 }
 
 export const authFieldLimits = {

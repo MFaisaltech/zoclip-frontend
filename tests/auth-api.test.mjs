@@ -48,6 +48,17 @@ test('refresh restores identity with GET /me without minting CSRF or storing a b
   assert.equal(calls[0].headers['X-CSRF-Token'], undefined)
 })
 
+test('invite redemption uses CSRF and credentials without login or automatic replay', async () => {
+  const {client, calls} = fixture((path) => path.endsWith('/csrf') ? json({csrf_token: token}) : json({message: 'Accepted'}))
+  await client.acceptInvite({token, password: 'long private password'})
+  assert.deepEqual(calls.map(call => call.path), ['/api/v1/auth/csrf', '/api/v1/auth/invite/accept'])
+  assert.equal(calls[1].headers['X-CSRF-Token'], token)
+  assert.equal(calls[1].credentials, 'include')
+  const failed = fixture((path) => path.endsWith('/csrf') ? json({csrf_token: token}) : json({code: 'invalid_token'}, 400))
+  await assert.rejects(failed.client.acceptInvite({token, password: 'long private password'}), {status: 400})
+  assert.equal(failed.calls.length, 2)
+})
+
 test('CSRF failure is not replayed; a user retry obtains a fresh token', async () => {
   let attempt = 0
   const { client, calls } = fixture((path) => path.endsWith('/csrf') ? json({ csrf_token: token }) : ++attempt === 1 ? json({ code: 'csrf_failed' }, 403) : json({ message: 'Done' }))

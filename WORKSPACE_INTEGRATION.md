@@ -1,14 +1,11 @@
 # Phase 8, Milestone 2: workspace and credits
 
-Milestones 3–4 now add media ingestion/processing and the
-[clip editor/export integration](EDITOR_INTEGRATION.md). The read-only scope
-below records the original M2 implementation.
-
-This records the completed M2 read integration. M3 now adds uploads and processing;
-see [MEDIA_INTEGRATION.md](MEDIA_INTEGRATION.md). The M2-only scope notes below
-are historical. Milestone 1 cookie authentication and CSRF
-mutations remain intact. No uploads, processing requests, editing, playback,
-exports, checkout, payments or admin workflows are enabled by this frontend.
+This records the completed M2 read integration. Existing committed Milestones 3–4
+add [media ingestion/processing](MEDIA_INTEGRATION.md) and
+[clip editing/export](EDITOR_INTEGRATION.md); those changes were preserved during
+the M2-only resumption review on 2026-10-13. No later milestone work was performed
+in that review. Milestone 1 cookie authentication and CSRF mutations remain intact.
+Checkout, payments and admin workflows remain unavailable in this frontend.
 
 ## Contracts and display behavior
 
@@ -43,8 +40,10 @@ List array pages have no total/next-page indicator. A full 20-record page offers
 Load more; the following page can be empty. Ledger uses its explicit cursor.
 Ledger and entitlements retain the backend's UUID order; media retains newest
 creation order. Page retries preserve loaded records; refresh clears stale data.
-Each resource has independent loading/empty/error/retry states. Job updates are
-snapshots; use Refresh. The visible-page session timer also reloads workspace data.
+Each resource has independent loading/empty/error/retry states. M2 listing updates
+are snapshots; use Refresh. The visible-page session timer revalidates identity
+in the background; it does not refresh these listing stores. M3 job tracking has
+its own polling.
 
 Available and reserved credits are displayed separately. An entitlement uses
 the backend's `active` flag, including future, expired or revoked periods.
@@ -55,9 +54,11 @@ Null prices are labeled unconfigured, rather than free. Purchases stay disabled.
 ## Account isolation
 
 The workspace is keyed by authenticated user ID. Each mount owns its resource
-stores; there is no shared account cache or browser storage. Session revalidation
-withholds and unmounts the workspace. Logout/account changes discard stores and
-abort reads. Generation guards also reject late responses from fetches that ignore
+stores; there is no shared account cache or browser storage. Explicit session
+revalidation withholds and unmounts the workspace. Focus/visibility/timer checks
+run in the background to preserve in-flight work; any failed check hides the
+workspace, and a different identity remounts it. Logout/account changes discard
+stores and abort reads. Generation guards also reject late responses from fetches that ignore
 abort. A 401 on any workspace read immediately clears the visible workspace and
 CSRF memory and shows the M1 expiry screen; canceled old requests cannot invalidate
 a newly authenticated account. BroadcastChannel coordinates other tabs; without
@@ -129,3 +130,10 @@ The example origin is a placeholder for local build verification, not a deployme
 target. Type checks remain enabled. Normal config is unchanged when the optional
 low-memory variable is absent. Temporary test servers were stopped after checking;
 their disposable data and visual review evidence were preserved.
+
+Private staging now uses the non-redeemable `/jobs/quote-preview` endpoint for Get
+processing quote. Missing approved pricing displays an unavailable estimate with the
+real requested settings; it never substitutes a fake price. Confirmation controls and
+restoration of stored commercial quotes are disabled in this frontend mode. Production
+continues using the existing quote and reserve workflow. Deployed staging frontend:
+`dpl_vCUcWT7j1kFFukzs3axrg4ztjbtz`; backend `staging-20261015-quotefix1`.

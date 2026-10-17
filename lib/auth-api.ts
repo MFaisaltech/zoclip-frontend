@@ -20,7 +20,7 @@ export function authErrorMessage(error: unknown): string {
     validation_failed: 'Please check your email, password, and verification token.',
     network_error: 'Cannot reach ZoClip. Check your connection and try again. Your last request may have completed.',
     timeout: 'ZoClip took too long to respond. Your request may have completed; check before trying again.',
-    api_unconfigured: 'Authentication is unavailable. The API origin needs to be configured.',
+    api_unconfigured: 'Sign-in is temporarily unavailable. Please try again later.',
     invalid_response: 'ZoClip returned an unexpected response. Please try again later.',
   }
   if (error.status === 429) return `Too many attempts. Please wait${error.retryAfter ? ` at least ${error.retryAfter} seconds` : ' a few minutes'} before trying again.`
@@ -128,6 +128,7 @@ export function createAuthClient(options: { origin?: string; fetch?: typeof fetc
   return {
     me: () => request('GET /api/v1/me'),
     register: (body: AuthSchemas['Credentials']) => mutate('POST /api/v1/auth/register', body),
+    acceptInvite: (body: AuthSchemas['InviteInput']) => mutate('POST /api/v1/auth/invite/accept', body),
     verifyEmail: (body: AuthSchemas['TokenInput']) => mutate('POST /api/v1/auth/verify-email', body),
     login: (body: AuthSchemas['Credentials']) => mutate('POST /api/v1/auth/login', body),
     logout: () => mutate('POST /api/v1/auth/logout'),
