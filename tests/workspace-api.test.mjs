@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import ts from 'typescript'
+import './customer-copy.test.mjs'
 
 const modules = new Map()
 async function load(name) {

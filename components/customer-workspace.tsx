@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Clapperboard, CreditCard, Download, Film, LoaderCircle, LogOut, Play, Scissors, ShieldCheck, Upload, UserRound, X } from 'lucide-react'
-import type { User } from '@/lib/auth-api'
+import { authApi, authErrorMessage, type User } from '@/lib/auth-api'
 import { mediaApi, mediaErrorMessage, type MediaSchemas } from '@/lib/media-api'
 import { useWorkspaceResource } from '@/lib/use-workspace'
 import { useFinance } from '@/lib/use-finance'
-import { durationLabel, jobStatus, videoStatus } from '@/lib/customer-copy'
+import { creditActivity, durationLabel, jobStatus, videoStatus } from '@/lib/customer-copy'
 import MediaStudio, { Generation, JobMonitor, finalJob } from './media-studio'
 import { ClipEditor } from './clip-workbench'
 import AdminDashboard from './admin-dashboard'
@@ -17,6 +17,15 @@ const button='inline-flex items-center justify-center gap-2 rounded-xl border bo
 const primary=`${button} !border-transparent !bg-[#7668df] !text-white hover:!bg-[#6557ce]`
 const date=(value:string)=>new Date(value).toLocaleDateString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})
 type Clip=NonNullable<ReturnType<typeof useWorkspaceResource<'clips'>>['data']>[number]
+
+function AccountSecurity({email}:{email:string}) {
+  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState<unknown>(null)
+  return <section className={`${panel} mt-5`}><h2 className="font-semibold">Password and security</h2><p className="mt-3 text-sm text-[#77736e]">Request a private password reset link. Changing your password signs out all existing sessions.</p><button className={`${button} mt-5`} disabled={busy} onClick={()=>{
+    if(busy)return
+    setBusy(true);setMessage('');setError(null)
+    void authApi.forgotPassword({email}).then(result=>setMessage(result.message),setError).finally(()=>setBusy(false))
+  }}>{busy?'Requesting link…':'Request password reset'}</button>{message&&<p role="status" className="mt-3 text-sm">{message}</p>}{!!error&&<p role="alert" className="mt-3 text-sm">{authErrorMessage(error)}</p>}</section>
+}
 
 function ClipCard({clip,onEdit}:{clip:Clip;onEdit:()=>void}) {
   const [output,setOutput]=useState<MediaSchemas['OutputView']|null>(null)
@@ -70,7 +79,7 @@ function Credits() {
     {!!overview.data?.plan?.price?.rules.minimum_job_credits&&<p className="text-sm text-[#77736e]">Each video has a minimum price of {overview.data.plan.price.rules.minimum_job_credits} credits, including shorter videos. Review the exact price before generating.</p>}
     {overview.data?.plan?.price&&<section className={panel}><h2 className="font-semibold">How clipping is priced</h2><p className="mt-3 text-sm leading-7 text-[#77736e]">{overview.data.plan.price.rules.credits_per_minute} credits per started minute of source video, plus {overview.data.plan.price.rules.credits_per_output} per requested clip. Captions and vertical framing {overview.data.plan.price.rules.captions_credits+overview.data.plan.price.rules.reframe_credits===0?'are included.':'are shown in your price before you confirm.'}</p><p className="mt-2 text-sm text-[#77736e]">Up to {overview.data.plan.price.rules.max_outputs} clips per video. Your exact price appears beside Generate clips.</p></section>}
     <section className={panel}><h2 className="font-semibold">Plans</h2><div className="mt-4 grid gap-3 sm:grid-cols-3">{plans.data?.filter(plan=>plan.kind==='plan'&&plan.slug!=='free'&&plan.enabled).map(plan=><div key={plan.id} className="rounded-xl border border-[#eeeae5] p-5"><h3 className="font-semibold capitalize">{plan.slug}</h3><p className="mt-2 text-sm text-[#77736e]">Coming soon</p></div>)}</div></section>
-    <section className={panel}><h2 className="font-semibold">Credit history</h2>{history.status==='error'?<><p role="alert" className="mt-3 text-sm">{mediaErrorMessage(history.error)}</p><button className={button} onClick={()=>{void history.refresh()}}>Try again</button></>:history.status==='loading'?<p role="status" className="mt-4 text-sm">Loading history…</p>:!history.data?.items.length?<p className="mt-4 text-sm text-[#77736e]">Your credit activity will appear here.</p>:<ul className="mt-4 divide-y divide-[#eeeae5]">{history.data.items.map(row=><li className="flex flex-wrap justify-between gap-2 py-4 text-sm" key={row.id}><span>{({GRANT:'Credits added',ADMIN_ADJUST:'Balance adjustment',RESERVE:'Clip generation started',SETTLE:'Clips completed',RELEASE:'Credits returned',REFUND:'Refund'} as Record<string,string>)[row.operation]??'Balance update'}<span className="ml-3 text-xs text-[#77736e]">{date(row.created_at)}</span></span><span>{row.operation==='SETTLE'?-row.reserved_delta:row.available_delta} credits</span></li>)}</ul>}{history.cursor&&<button className={`${button} mt-3`} disabled={history.loadingMore} onClick={()=>{void history.loadMore()}}>{history.loadingMore?'Loading…':'Show more'}</button>}</section>
+    <section className={panel}><h2 className="font-semibold">Credit history</h2>{history.status==='error'?<><p role="alert" className="mt-3 text-sm">{mediaErrorMessage(history.error)}</p><button className={button} onClick={()=>{void history.refresh()}}>Try again</button></>:history.status==='loading'?<p role="status" className="mt-4 text-sm">Loading history…</p>:!history.data?.items.length?<p className="mt-4 text-sm text-[#77736e]">Your credit activity will appear here.</p>:<ul className="mt-4 divide-y divide-[#eeeae5]">{history.data.items.map(row=><li className="flex flex-wrap justify-between gap-2 py-4 text-sm" key={row.id}><span>{({GRANT:'Credits added',ADMIN_ADJUST:'Balance adjustment',RESERVE:'Clip generation started',SETTLE:'Clips completed',RELEASE:'Credits returned',REFUND:'Refund'} as Record<string,string>)[row.operation]??'Balance update'}<span className="ml-3 text-xs text-[#77736e]">{date(row.created_at)}</span></span><span>{creditActivity(row)}</span></li>)}</ul>}{history.cursor&&<button className={`${button} mt-3`} disabled={history.loadingMore} onClick={()=>{void history.loadMore()}}>{history.loadingMore?'Loading…':'Show more'}</button>}</section>
   </div>
 }
 
@@ -108,7 +117,7 @@ export default function CustomerWorkspace({user,onLogout,loggingOut,logoutError,
       </>}
       {section==='Clips'&&<><div className="mb-8"><h1 className="text-3xl font-semibold tracking-tight">Your clips</h1><p className="mt-3 text-sm text-[#77736e]">Preview your moments, make edits and download MP4s.</p></div>{editId&&<><button className={`${button} mb-4`} onClick={()=>setEditId(null)}><X size={15}/>Close editor</button><ClipEditor key={editId} owner={user.id} clipId={editId} onChanged={refresh}/></>}{clips.status==='loading'?<p role="status">Loading clips…</p>:clips.status==='error'?<div className={panel}><p role="alert" className="mb-4 text-sm">{mediaErrorMessage(clips.error)}</p><button className={button} onClick={()=>{void clips.refresh()}}>Try again</button></div>:!clips.data?.length?<div className={`${panel} py-16 text-center`}><Clapperboard className="mx-auto text-[#a79dcd]" size={32}/><h2 className="mt-5 font-semibold">Your clips will live here</h2><p className="mt-2 text-sm text-[#77736e]">Generate clips from a video to get started.</p><button className={`${primary} mt-5`} onClick={()=>onNavigate('Videos')}>Go to your videos</button></div>:<div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">{clips.data?.map(clip=><ClipCard key={`${clip.id}:${clip.revision}`} clip={clip} onEdit={()=>{setEditId(clip.id);window.scrollTo({top:0,behavior:'smooth'})}}/>)}</div>}{clips.cursor&&<button className={`${button} mt-4`} disabled={clips.loadingMore} onClick={()=>{void clips.loadMore()}}>Show more clips</button>}</>}
       {section==='Credits & plans'&&<Credits/>}
-      {section==='Account'&&<><h1 className="mb-6 text-3xl font-semibold tracking-tight">Your account</h1><section className={panel}><h2 className="font-semibold">Email address</h2><p className="mt-3 break-words text-sm text-[#77736e]">{user.email}</p><p className="mt-3 text-xs text-[#6558c8]">Email verified</p><p className="mt-6 text-sm text-[#77736e]">Joined {date(user.created_at)}</p><button className={`${button} mt-5`} disabled={refreshing} onClick={()=>{if(refreshing)return;setRefreshing(true);void onRefreshProfile().finally(()=>setRefreshing(false))}}>{refreshing?'Refreshing…':'Refresh account'}</button></section></>}
+      {section==='Account'&&<><h1 className="mb-6 text-3xl font-semibold tracking-tight">Your account</h1><section className={panel}><h2 className="font-semibold">Email address</h2><p className="mt-3 break-words text-sm text-[#77736e]">{user.email}</p><p className="mt-3 text-xs text-[#6558c8]">Email verified</p><p className="mt-6 text-sm text-[#77736e]">Joined {date(user.created_at)}</p><button className={`${button} mt-5`} disabled={refreshing} onClick={()=>{if(refreshing)return;setRefreshing(true);void onRefreshProfile().finally(()=>setRefreshing(false))}}>{refreshing?'Refreshing…':'Refresh account'}</button></section><AccountSecurity email={user.email}/></>}
       {section==='Admin'&&user.role==='admin'&&<AdminDashboard user={user} onChanged={refresh}/>}
     </div></main>
   </div>

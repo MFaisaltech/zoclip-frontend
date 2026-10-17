@@ -75,8 +75,10 @@ export function Generation({owner, videoId, onJob}: {owner: string; videoId: str
   const control = useRef<AbortController|null>(null)
   const storageKey = `zoclip-generation-v2:${owner}:${videoId}`
   const quotedCount = useRef(1)
+  const quotedOptions = useRef({captions:true,reframe:true})
+  const quotedVideo = useRef('')
   useEffect(() => {
-    const controller = new AbortController(); control.current=controller; setBusy(true);setError(null);setAmount(null)
+    const controller = new AbortController(); control.current=controller; setBusy(true);setError(null);setAmount(null);setRequest(null)
     async function load() {
       try {
         const [source,wallet,billing] = await Promise.all([
@@ -89,7 +91,8 @@ export function Generation({owner, videoId, onJob}: {owner: string; videoId: str
         setBalance(wallet.available_credits)
         const maximum=Math.min(3,billing.plan?.price?.rules.max_outputs??3)
         setMaxCount(maximum)
-        const suggested=reload===0 ? Math.max(1,Math.min(maximum,Math.floor(duration/60))) : count
+        const suggested=quotedVideo.current!==videoId ? Math.max(1,Math.min(maximum,Math.floor(duration/60))) : Math.max(1,Math.min(maximum,count))
+        quotedVideo.current=videoId;quotedOptions.current={captions,reframe}
         setCount(suggested);quotedCount.current=suggested
         const body={source_seconds:duration,output_count:suggested,edit_count:0,captions,reframe}
         if(privatePreview) {
@@ -99,9 +102,10 @@ export function Generation({owner, videoId, onJob}: {owner: string; videoId: str
         } else {
           let saved: Confirmed|null=null
           try {saved=JSON.parse(sessionStorage.getItem(storageKey)??'null')}catch{/* Optional recovery. */}
-          if(saved && matches({$ref:'#/components/schemas/QuoteView'},saved.quote,mediaDefinitions) && /^[\w.:-]{1,128}$/.test(saved.key) && typeof saved.confirmed==='boolean' && (saved.confirmed || Date.parse(saved.quote.expires_at)>Date.now())) {
+          if(saved && matches({$ref:'#/components/schemas/QuoteView'},saved.quote,mediaDefinitions) && saved.quote.request.source_seconds===duration && saved.quote.request.output_count<=maximum && /^[\w.:-]{1,128}$/.test(saved.key) && typeof saved.confirmed==='boolean' && (saved.confirmed || Date.parse(saved.quote.expires_at)>Date.now())) {
             setRequest(saved);setAmount(saved.quote.credits);setCount(saved.quote.request.output_count);quotedCount.current=saved.quote.request.output_count
             setCaptions(saved.quote.request.captions??true);setReframe(saved.quote.request.reframe??true)
+            quotedOptions.current={captions:saved.quote.request.captions??true,reframe:saved.quote.request.reframe??true}
           } else {
             const quote=await mediaApi.call('quote',{body,key:crypto.randomUUID(),signal:controller.signal})
             const next={quote,key:crypto.randomUUID(),confirmed:false}
@@ -129,18 +133,21 @@ export function Generation({owner, videoId, onJob}: {owner: string; videoId: str
       if(cause instanceof AuthApiError && cause.status>=400 && cause.status<500 && ![401,408,429].includes(cause.status)) {sessionStorage.removeItem(storageKey);setRequest(null)}
     }finally{if(!controller.signal.aborted)setBusy(false);control.current=null}
   }
-  const changed=count!==quotedCount.current || (!!request && (captions!==(request.quote.request.captions??true)||reframe!==(request.quote.request.reframe??true)))
+  const changed=count!==quotedCount.current || captions!==quotedOptions.current.captions || reframe!==quotedOptions.current.reframe
   return <section aria-label="Generate clips" className={panel}>
     <h2 className="text-xl font-semibold">Your video is ready.</h2>
     <p className="mt-2 text-sm leading-6 text-[#77736e]">We’ll find the best moments and create vertical MP4 clips, with captions. Most clips are 15–30 seconds; shorter videos may produce shorter clips.</p>
+    <fieldset disabled={busy||request?.confirmed} className="my-5">
+      <label htmlFor="output-count" className="block text-sm font-medium">Number of clips<input id="output-count" className={input} type="number" min={1} max={maxCount} value={count} onChange={e=>setCount(Number(e.target.value))}/></label>
+      <p className="mt-2 text-xs text-[#77736e]">Choose up to {maxCount} clips per video. Useful moments and your exact quote determine what can be generated.</p>
+    </fieldset>
     <details className="my-5 rounded-xl border border-[#eeeae5] p-4"><summary className="cursor-pointer text-sm font-medium">Advanced settings</summary>
       <fieldset disabled={busy||request?.confirmed} className="mt-4 space-y-4">
-        <label htmlFor="output-count" className="block text-sm">Number of clips<input id="output-count" className={input} type="number" min={1} max={maxCount} value={count} onChange={e=>setCount(Number(e.target.value))}/></label>
         <label htmlFor="generate-captions" className="flex gap-2 text-sm"><input id="generate-captions" type="checkbox" checked={captions} onChange={e=>setCaptions(e.target.checked)}/>Add captions</label>
         <label htmlFor="generate-reframe" className="flex gap-2 text-sm"><input id="generate-reframe" type="checkbox" checked={reframe} onChange={e=>setReframe(e.target.checked)}/>Fill the vertical frame</label>
-        <button className={button} disabled={!Number.isInteger(count)||count<1||count>maxCount} onClick={()=>{sessionStorage.removeItem(storageKey);setRequest(null);setReload(n=>n+1)}}>Update price</button>
       </fieldset>
     </details>
+    <button className={button} disabled={busy||request?.confirmed||!Number.isInteger(count)||count<1||count>maxCount} onClick={()=>{sessionStorage.removeItem(storageKey);setRequest(null);setReload(n=>n+1)}}>Update price</button>
     {busy&&!request&&<p role="status" className="my-4 text-sm">Calculating your price…</p>}
     {amount!==null && <div className="my-4 rounded-xl bg-[#f4f1ff] p-5">
       <p className="font-semibold">Create up to {quotedCount.current} {quotedCount.current===1?'clip':'clips'} · {amount.toLocaleString()} credits</p>

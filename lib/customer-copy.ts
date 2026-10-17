@@ -8,3 +8,9 @@ export function jobStatus(state: string, kind: string) {
 export function durationLabel(seconds: number) {
   return seconds < 60 ? `${Math.round(seconds)} sec` : `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')} min`
 }
+export function creditActivity(row: {operation:string;available_delta:number;reserved_delta:number}) {
+  if(row.operation==='RESERVE')return `${Math.max(0,row.reserved_delta)} reserved`
+  if(row.operation==='SETTLE')return `${Math.max(0,-row.reserved_delta)} spent`
+  if(row.operation==='RELEASE')return `${Math.max(0,row.available_delta)} returned`
+  return `${row.available_delta>0?'+':''}${row.available_delta} credits`
+}
