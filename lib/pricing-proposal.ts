@@ -17,15 +17,9 @@ export const proposedPackages = [
     "representativeCredits": 60
   }
 ] as const
-export const lowerAllocationOptions = [
-  {
-    "profile": "planning",
-    "creator": 191,
-    "pro": 486
-  },
-  {
-    "profile": "bounded_admission_envelope",
-    "creator": 61,
-    "pro": 155
-  }
-] as const
+export const capacityReview = {
+  "activationAllowed": false,
+  "projectedOneOutputJobs": 2165,
+  "projectedThreeOutputEditJobs": 968,
+  "creditsPerJobChanged": false
+} as const
