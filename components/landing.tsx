@@ -7,7 +7,7 @@ export default function Landing({onEnter}:{onEnter:()=>void}) {
   const [interactive,setInteractive]=useState(false)
   useEffect(()=>setInteractive(true),[])
   const privateAccess=process.env.NEXT_PUBLIC_PRIVATE_STAGING==='true'
-  return <div className="min-h-screen bg-[#fbfaf8] text-[#28253a]">
+  return <div className="min-h-screen overflow-x-clip bg-[#fbfaf8] text-[#28253a]">
     <header className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-6 sm:px-8"><a className="flex items-center gap-2.5 text-xl font-semibold tracking-tight" href="/"><span className="grid size-9 place-items-center rounded-xl bg-[#28253a] text-white"><Scissors size={18}/></span>zoclip</a><nav aria-label="Main" className="hidden gap-7 text-sm text-[#77736e] md:flex"><a className="hover:text-[#7668df]" href="#how-it-works">How it works</a><a className="hover:text-[#7668df]" href="/pricing">Pricing</a></nav><button className="rounded-xl border border-[#dedad4] px-4 py-2.5 text-sm font-medium hover:bg-white" disabled={!interactive} onClick={onEnter}>Sign in</button></header>
     <main>
       <section className="mx-auto grid max-w-6xl items-center gap-12 px-5 pb-20 pt-12 sm:px-8 sm:pt-20 lg:grid-cols-[1.1fr_0.9fr] lg:gap-20 lg:pb-28">

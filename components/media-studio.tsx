@@ -10,9 +10,9 @@ import { workspaceApi } from '@/lib/workspace-api'
 import { jobStatus } from '@/lib/customer-copy'
 
 const panel = 'mb-6 rounded-2xl border border-[#e8e4de] bg-white p-5 sm:p-7'
-const button = 'rounded-xl border border-[#d9d5d0] bg-white px-4 py-2.5 text-sm font-medium text-[#6457c8] hover:bg-[#f2efff] disabled:opacity-50 disabled:cursor-not-allowed'
+const button = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-[#d9d5d0] bg-white px-4 py-2.5 text-sm font-medium text-[#6457c8] hover:bg-[#f2efff] disabled:opacity-50 disabled:cursor-not-allowed'
 const primary = `${button} !border-transparent !bg-[#7668df] !text-white hover:!bg-[#6557ce]`
-const input = 'mt-2 block w-full rounded-xl border border-[#d9d5d0] bg-[#fbfaf8] p-3 text-sm'
+const input = 'mt-2 block w-full rounded-xl border border-[#d9d5d0] bg-[#fbfaf8] p-3 text-base sm:text-sm'
 type Job = MediaSchemas['JobView']
 type Quote = MediaSchemas['QuoteView']
 const privatePreview = process.env.NEXT_PUBLIC_PRIVATE_STAGING === 'true'
@@ -138,7 +138,7 @@ export function Generation({owner, videoId, onJob}: {owner: string; videoId: str
     <h2 className="text-xl font-semibold">Your video is ready.</h2>
     <p className="mt-2 text-sm leading-6 text-[#77736e]">We’ll find the best moments and create vertical MP4 clips, with captions. Most clips are 15–30 seconds; shorter videos may produce shorter clips.</p>
     <fieldset disabled={busy||request?.confirmed} className="my-5">
-      <label htmlFor="output-count" className="block text-sm font-medium">Number of clips<input id="output-count" className={input} type="number" min={1} max={maxCount} value={count} onChange={e=>setCount(Number(e.target.value))}/></label>
+      <label htmlFor="output-count" className="block text-sm font-medium">Number of clips<input id="output-count" className={input} type="number" inputMode="numeric" min={1} max={maxCount} value={count} onChange={e=>setCount(Number(e.target.value))}/></label>
       <p className="mt-2 text-xs text-[#77736e]">Choose up to {maxCount} clips per video. Useful moments and your exact quote determine what can be generated.</p>
     </fieldset>
     <details className="my-5 rounded-xl border border-[#eeeae5] p-4"><summary className="cursor-pointer text-sm font-medium">Advanced settings</summary>
@@ -245,7 +245,7 @@ export default function MediaStudio({owner, visible, videoId, jobId, onJob, onCh
         <h3 className="font-medium">Import from a video link</h3>
         <p className="my-2 text-xs leading-5 text-[#77736e]">Use a direct link to an MP4 or WebM file from a supported source. For other links, download your video first and upload the file.</p>
         <label htmlFor="video-url" className="block text-sm">Video link<input id="video-url" className={input} type="url" maxLength={2048} value={url} disabled={busy} onChange={e => setUrl(e.target.value)} placeholder="https://example.com/video.mp4" /></label>
-        <label htmlFor="import-size" className="mt-3 block text-sm">Maximum file size (MB)<input id="import-size" className={input} type="number" min={1} max={4096} value={maxMiB} disabled={busy} onChange={e => setMaxMiB(Number(e.target.value))} /></label>
+        <label htmlFor="import-size" className="mt-3 block text-sm">Maximum file size (MB)<input id="import-size" className={input} type="number" inputMode="numeric" min={1} max={4096} value={maxMiB} disabled={busy} onChange={e => setMaxMiB(Number(e.target.value))} /></label>
         <button className={`${primary} mt-3`} disabled={busy || !rights || !url || !Number.isInteger(maxMiB) || maxMiB < 1 || maxMiB > 4096} onClick={() => { void run('import') }}>Import video</button>
       </details>
       <ErrorText error={error} />

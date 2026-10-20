@@ -8,7 +8,7 @@ type Clip = MediaSchemas['ClipView']
 type Job = MediaSchemas['JobView']
 const panel = 'mb-6 rounded-2xl border border-[#e8e4de] bg-white p-5'
 const button = 'rounded-xl border border-[#d9d5d0] px-4 py-2 text-sm font-medium text-[#6457c8] hover:bg-[#f2efff] disabled:opacity-50 disabled:cursor-not-allowed'
-const input = 'mt-1 block w-full min-w-0 rounded-xl border border-[#d9d5d0] bg-[#fbfaf8] p-2 text-sm'
+const input = 'mt-1 block w-full min-w-0 rounded-xl border border-[#d9d5d0] bg-[#fbfaf8] p-2 text-base sm:text-sm'
 function useTask() {
   const [busy, setBusy] = useState(false), [error, setError] = useState<unknown>(null)
   const active = useRef<AbortController | null>(null)

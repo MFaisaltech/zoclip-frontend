@@ -3,7 +3,7 @@ import { RefreshCw, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { financeError } from '@/lib/billing';
 export const financeAction = 'inline-flex items-center justify-center gap-2 rounded-xl border border-[#ddd7ed] bg-white px-4 py-2.5 text-sm font-medium text-[#6457c8] transition hover:bg-[#f2efff] disabled:cursor-not-allowed disabled:opacity-50';
-export const financeInput = 'mt-1 w-full rounded-xl border border-[#ded9e5] bg-[#fcfbfe] px-3 py-2.5 text-sm outline-none focus:border-[#7668df] focus:ring-2 focus:ring-[#7668df]/15 disabled:opacity-60';
+export const financeInput = 'mt-1 w-full rounded-xl border border-[#ded9e5] bg-[#fcfbfe] px-3 py-2.5 text-base outline-none focus:border-[#7668df] focus:ring-2 focus:ring-[#7668df]/15 disabled:opacity-60 sm:text-sm';
 export function FinanceHeading({ title, children }: {
     title: string;
     children: ReactNode;

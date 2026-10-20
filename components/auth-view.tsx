@@ -14,7 +14,7 @@ const copy: Record<AuthMode, { title: string; text: string; action: string }> = 
   reset: { title: 'Choose a new password', text: 'Enter the recovery token and your new password.', action: 'Reset password' },
   invite: { title: 'Your private invitation', text: 'Enter your single-use invitation token and choose a password. Then sign in with your approved email address.', action: 'Accept invitation' },
 }
-const inputStyle = 'mt-2 w-full rounded-xl border border-[#dedad4] bg-[#fbfaf8] px-3.5 py-3 text-sm outline-none focus:border-[#7668df] disabled:opacity-60'
+const inputStyle = 'mt-2 w-full rounded-xl border border-[#dedad4] bg-[#fbfaf8] px-3.5 py-3 text-base outline-none focus:border-[#7668df] disabled:opacity-60 sm:text-sm'
 const linkStyle = 'font-medium text-[#7668df] disabled:opacity-50'
 const registrationAvailable = process.env.NEXT_PUBLIC_PRIVATE_STAGING !== 'true' && process.env.NEXT_PUBLIC_ENABLE_REGISTRATION !== 'false'
 
