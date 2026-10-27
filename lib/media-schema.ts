@@ -1,11 +1,12 @@
 // Generated from backend/docs/openapi.json. Do not edit.
-// Source SHA-256: 7c377042b2aa05bbf7a94c7e34bf34e630d1bbf9433297ea8ae0ae0ea0b5f469
+// Source SHA-256: b5031ab0bc1ebcfb1f61056d946a3275424351335f9d1b8941975ffabe2837a7
 export interface MediaSchemas {
   "UploadInput": { "size_bytes": number; "sha256": string; "rights_attested": true }
   "UploadView": { "id": string; "video_id": string; "state": string; "expected_bytes": number; "part_bytes": number; "expires_at": string; "received_parts"?: Array<number> }
   "PartView": { "number": number; "size_bytes": number; "sha256": string }
   "JobView": { "id": string; "video_id": string; "kind": string; "state": string; "error_code": string | null; "attempts": number; "created_at": string; "updated_at": string; "stage": string; "progress_percent": number | null; "estimated_credits": number | null; "heartbeat_at": string | null; "queue_position"?: null; "reservation_id": string | null }
   "ImportInput": { "url": string; "max_bytes": number; "rights_attested": true }
+  "LinkImportInput": { "url": string; "rights_attested": true }
   "QuoteInput": { "source_seconds": number; "output_count": number; "edit_count"?: number; "captions"?: boolean; "reframe"?: boolean }
   "QuoteView": { "id": string; "price_version_id": string; "credits": number; "request": MediaSchemas["QuoteInput"]; "expires_at": string }
   "QuotePreviewView": { "preview_only"?: true; "processing_enabled"?: false; "pricing_status": "unconfigured" | "unapproved" | "configured"; "price_version_id": string | null; "credits": number | null; "request": MediaSchemas["QuoteInput"] }
@@ -57,6 +58,7 @@ export interface MediaOperations {
   complete: { request: null; response: MediaSchemas["JobView"] }
   deleteUpload: { request: null; response: null }
   importUrl: { request: MediaSchemas["ImportInput"]; response: MediaSchemas["JobView"] }
+  importLink: { request: MediaSchemas["LinkImportInput"]; response: MediaSchemas["JobView"] }
   quote: { request: MediaSchemas["QuoteInput"]; response: MediaSchemas["QuoteView"] }
   quotePreview: { request: MediaSchemas["QuoteInput"]; response: MediaSchemas["QuotePreviewView"] }
   generate: { request: MediaSchemas["GenerateInput"]; response: MediaSchemas["JobView"] }
@@ -172,6 +174,21 @@ export const mediaDescriptors = {
     },
     "request": {
       "$ref": "#/components/schemas/ImportInput"
+    },
+    "queries": [],
+    "revisionHeader": false,
+    "download": false,
+    "idempotent": true,
+    "binary": false
+  },
+  "importLink": {
+    "path": "/api/v1/videos/import-link",
+    "method": "POST",
+    "response": {
+      "$ref": "#/components/schemas/JobView"
+    },
+    "request": {
+      "$ref": "#/components/schemas/LinkImportInput"
     },
     "queries": [],
     "revisionHeader": false,
@@ -929,6 +946,30 @@ export const mediaDefinitions = {
       "rights_attested"
     ],
     "title": "ImportInput"
+  },
+  "LinkImportInput": {
+    "properties": {
+      "url": {
+        "type": "string",
+        "maxLength": 2048,
+        "minLength": 1,
+        "format": "password",
+        "title": "Url",
+        "writeOnly": true
+      },
+      "rights_attested": {
+        "type": "boolean",
+        "const": true,
+        "title": "Rights Attested"
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "url",
+      "rights_attested"
+    ],
+    "title": "LinkImportInput"
   },
   "QuoteInput": {
     "properties": {

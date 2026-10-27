@@ -9,6 +9,16 @@ import { mediaDefinitions } from '@/lib/media-schema'
 import { workspaceApi } from '@/lib/workspace-api'
 import { jobStatus } from '@/lib/customer-copy'
 
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'])
+
+function isYouTubeLink(value: string): boolean {
+  try {
+    return YOUTUBE_HOSTS.has(new URL(value).hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
 const panel = 'mb-6 rounded-2xl border border-[#e8e4de] bg-white p-5 sm:p-7'
 const button = 'inline-flex min-h-11 items-center justify-center rounded-xl border border-[#d9d5d0] bg-white px-4 py-2.5 text-sm font-medium text-[#6457c8] hover:bg-[#f2efff] disabled:opacity-50 disabled:cursor-not-allowed'
 const primary = `${button} !border-transparent !bg-[#7668df] !text-white hover:!bg-[#6557ce]`
@@ -209,10 +219,15 @@ export default function MediaStudio({owner, visible, videoId, jobId, onJob, onCh
       } else if (kind === 'import' && rights) {
         const parsed = new URL(url)
         if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash || (parsed.port && parsed.port !== '443')) throw new AuthApiError(422, 'unsupported_source')
-        const body = {url, max_bytes: maxMiB * 1024 * 1024, rights_attested: true as const}
+        const youTube = isYouTubeLink(url)
+        const body = youTube
+          ? {url, rights_attested: true as const}
+          : {url, max_bytes: maxMiB * 1024 * 1024, rights_attested: true as const}
         const text = JSON.stringify(body)
         if (importAttempt.current?.body !== text) importAttempt.current = {body: text, key: crypto.randomUUID()}
-        const job = await mediaApi.call('importUrl', {body, key: importAttempt.current.key, signal: controller.signal})
+        const job = youTube
+          ? await mediaApi.call('importLink', {body: body as {url: string; rights_attested: true}, key: importAttempt.current.key, signal: controller.signal})
+          : await mediaApi.call('importUrl', {body: body as {url: string; max_bytes: number; rights_attested: true}, key: importAttempt.current.key, signal: controller.signal})
         importAttempt.current = null; setUrl(''); setMessage('Your video is being imported.'); onJob(job); onChanged()
       } else if (kind === 'delete' && record) {
         let uploadId = record.uploadId
@@ -243,10 +258,10 @@ export default function MediaStudio({owner, visible, videoId, jobId, onJob, onCh
       {progress && <div role="status" className="my-4 text-sm"><p>{uploadProgressLabel(progress)}</p>{['hashing', 'uploading'].includes(progress.stage) && <p>{Math.round(progress.bytes / progress.total * 100)}% {progress.stage === 'hashing' ? 'prepared' : 'uploaded'}</p>}<progress className="mt-2 w-full accent-[#7668df]" aria-label={progress.stage === 'hashing' ? 'Preparing your video' : 'Upload progress'} value={['initiating', 'finalizing'].includes(progress.stage) ? undefined : progress.bytes} max={progress.total} /></div>}
       <details className="mt-6 border-t border-[#eeeae5] pt-5"><summary className="cursor-pointer text-sm font-medium">Have a video link?</summary>
         <h3 className="font-medium">Import from a video link</h3>
-        <p className="my-2 text-xs leading-5 text-[#77736e]">Use a direct link to an MP4 or WebM file from a supported source. For other links, download your video first and upload the file.</p>
-        <label htmlFor="video-url" className="block text-sm">Video link<input id="video-url" className={input} type="url" maxLength={2048} value={url} disabled={busy} onChange={e => setUrl(e.target.value)} placeholder="https://example.com/video.mp4" /></label>
-        <label htmlFor="import-size" className="mt-3 block text-sm">Maximum file size (MB)<input id="import-size" className={input} type="number" inputMode="numeric" min={1} max={4096} value={maxMiB} disabled={busy} onChange={e => setMaxMiB(Number(e.target.value))} /></label>
-        <button className={`${primary} mt-3`} disabled={busy || !rights || !url || !Number.isInteger(maxMiB) || maxMiB < 1 || maxMiB > 4096} onClick={() => { void run('import') }}>Import video</button>
+        <p className="my-2 text-xs leading-5 text-[#77736e]">Paste a YouTube link and we’ll fetch the video for you — no download or upload needed. Direct links to an MP4 or WebM file from a supported source also work.</p>
+        <label htmlFor="video-url" className="block text-sm">Video link<input id="video-url" className={input} type="url" maxLength={2048} value={url} disabled={busy} onChange={e => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" /></label>
+        {!isYouTubeLink(url) && <label htmlFor="import-size" className="mt-3 block text-sm">Maximum file size (MB)<input id="import-size" className={input} type="number" inputMode="numeric" min={1} max={4096} value={maxMiB} disabled={busy} onChange={e => setMaxMiB(Number(e.target.value))} /></label>}
+        <button className={`${primary} mt-3`} disabled={busy || !rights || !url || (!isYouTubeLink(url) && (!Number.isInteger(maxMiB) || maxMiB < 1 || maxMiB > 4096))} onClick={() => { void run('import') }}>Import video</button>
       </details>
       <ErrorText error={error} />
       {message && <p role="status" className="mt-3 text-sm text-[#6558c8]">{message}</p>}

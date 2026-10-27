@@ -13,6 +13,7 @@ const selected = {
   complete: ['post', '/api/v1/uploads/{upload_id}/complete'],
   deleteUpload: ['delete', '/api/v1/uploads/{upload_id}'],
   importUrl: ['post', '/api/v1/videos/import-url'],
+  importLink: ['post', '/api/v1/videos/import-link'],
   quote: ['post', '/api/v1/jobs/quote'],
   quotePreview: ['post', '/api/v1/jobs/quote-preview'],
   generate: ['post', '/api/v1/videos/{video_id}/generate'],
