@@ -1,4 +1,5 @@
 'use client'
+import { whatsappPurchase } from '@/lib/whatsapp-purchase'
 
 import { useState, type ReactNode } from 'react'
 import MediaStudio from '@/components/media-studio'
@@ -448,7 +449,7 @@ function Plans({ resource }: { resource: Resource<'plans'> }) {
         <Empty>No plans are available.</Empty>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {resource.data.map((plan) => (
+          {resource.data.filter(plan=>['creator','pro'].includes(plan.slug)).map((plan) => (
             <article
               key={plan.id}
               className="rounded-xl border border-[#eeeae5] p-4"
@@ -493,15 +494,13 @@ function Plans({ resource }: { resource: Resource<'plans'> }) {
               <p className="mt-3 text-xs text-[#8a857f]">
                 No automatic renewal · Credit expiry disabled
               </p>
-              <button disabled className={`${action} mt-4 w-full`}>
-                Purchases unavailable
-              </button>
+              <a href={whatsappPurchase(plan.slug)} target="_blank" rel="noopener noreferrer" className={`${action} mt-4 w-full`}>Buy via WhatsApp</a>
             </article>
           ))}
         </div>
       )}
       <Unavailable>
-        Merchant checkout is unavailable. Plan limits are supplied by ZoClip;
+        Payment is arranged via WhatsApp and independently verified by an administrator;
         viewing a plan does not grant credits or change your access.
       </Unavailable>
     </ResourcePanel>

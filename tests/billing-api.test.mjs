@@ -27,11 +27,55 @@ const {createMediaApi} = await import(await load('media-api'))
 const {AuthApiError} = await import(await load('auth-api'))
 const {formatPaisa,consumptionRules} = await import(await load('billing'))
 const {persistFinancialIntent,readFinancialIntent,sendFinancialIntent} = await import(await load('finance-actions'))
+const {whatsappPurchase} = await import(await load('whatsapp-purchase'))
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`
 const json = (value,status=200) => new Response(JSON.stringify(value),{status})
 const memory = () => {const map=new Map();return {getItem:key=>map.get(key)??null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key)}}
 const change = {operation:'adjustCredits',resourceId:id(1),body:{amount:2,reason:'Explicit offline unit test'}}
 const transaction = {id:id(2),operation:'ADMIN_ADJUST',available_delta:2,reserved_delta:0,available_after:7,reserved_after:0,reservation_id:null,created_at:'2026-10-14T00:00:00Z'}
+
+test('WhatsApp purchase uses the selected current package and asks for verified instructions',()=>{
+  for(const [slug,price,credits] of [['creator','1000','10,000'],['pro','2000','21,000']]) {
+    const url=new URL(whatsappPurchase(slug))
+    assert.equal(url.origin,'https://wa.me');assert.equal(url.pathname,'/923189753773')
+    const text=url.searchParams.get('text')
+    for(const value of [price,credits,'50 credits','verified bank/wallet','registered ZoClip email','payment screenshot','independently verify'])assert.ok(text.includes(value),value)
+  }
+  assert.throws(()=>whatsappPurchase('starter'))
+})
+
+test('manual account lookup encodes exact email and rejects invalid email before transport',async()=>{
+  const seen=[]
+  const api=createMediaApi({origin:'http://localhost:8000',fetch:async url=>{seen.push(url);return json([])}})
+  await api.call('manualUsers',{query:{email:'buyer+receipt@example.com'}})
+  assert.equal(new URL(seen[0]).searchParams.get('email'),'buyer+receipt@example.com')
+  await assert.rejects(api.call('manualUsers',{query:{email:'not-an-email'}}))
+  assert.equal(seen.length,1)
+})
+
+test('manual activation retries the original key after a lost response and uses CSRF',async()=>{
+  const storage=memory(),admin=id(9),seen=[]
+  const input={operation:'manualActivate',resourceId:id(1),body:{price_version_id:id(3),amount_paisa:100000,payment_reference:'BANK123456',independently_verified:true,reason:'Independently verified bank receipt'}}
+  const intent=persistFinancialIntent(admin,input,storage)
+  let offline=true
+  const order={id:id(4),price_version_id:id(3),provider:'manual',amount_paisa:100000,currency:'PKR',credits:10000,valid_days:0,state:'PAID',expires_at:'2099-01-01T00:00:00Z',paid_at:'2026-10-30T00:00:00Z',created_at:'2026-10-30T00:00:00Z',sandbox:false,auto_renews:false}
+  const api=createMediaApi({origin:'http://localhost:8000',authorize:fn=>fn('csrf-token'),fetch:async(url,options)=>{seen.push({url,options});if(offline)throw new Error('Lost response');return json({order,user_id:id(1),reference:'BANK123456',refund:null})}})
+  await assert.rejects(sendFinancialIntent(admin,intent,storage,api))
+  assert.equal(readFinancialIntent(admin,storage).key,intent.key)
+  assert.throws(()=>persistFinancialIntent(admin,input,storage))
+  offline=false
+  await sendFinancialIntent(admin,readFinancialIntent(admin,storage),storage,api)
+  assert.equal(readFinancialIntent(admin,storage),null)
+  for(const request of seen){assert.ok(request.url.endsWith(`/admin/manual-payments/users/${id(1)}/activate`));assert.equal(request.options.headers['Idempotency-Key'],intent.key);assert.equal(request.options.headers['X-CSRF-Token'],'csrf-token')}
+})
+
+test('manual refund binds the order path and never initiates an external transfer',async()=>{
+  const storage=memory(),admin=id(9),seen=[]
+  const intent=persistFinancialIntent(admin,{operation:'manualRefund',resourceId:id(4),body:{payment_reference:'REFUND123456',independently_verified:true,reason:'Verified completed external refund'}},storage)
+  await sendFinancialIntent(admin,intent,storage,{call:async(name,args)=>{seen.push({name,args});return {}}})
+  assert.deepEqual(seen[0].args.params,{order_id:id(4)})
+  assert.equal(seen[0].name,'manualRefund')
+})
 
 test('PKR integer formatting does not round financial amounts',()=>{
   assert.equal(formatPaisa(199),'PKR 1.99')
@@ -107,11 +151,12 @@ test('conclusive validation rejection allows correction without an uncertain dup
 test('blocked browser storage prevents a financial write',()=>{
   assert.throws(()=>persistFinancialIntent(id(99),change,{getItem:()=>null,setItem:()=>{throw Error('blocked')},removeItem:()=>{}}))
 })
-test('financial transport exposes no checkout, refund, AI or policy-opening operation',async()=>{
+test('financial transport exposes no gateway checkout, gateway refund or policy-opening operation',async()=>{
   const source=await readFile(new URL('../scripts/generate-media-api.mjs',import.meta.url),'utf8')
   assert.ok(!source.includes("['post', '/api/v1/billing/orders']"))
   assert.ok(!source.includes("['post', '/api/v1/admin/limits/versions']"))
-  assert.ok(!source.includes('/refund'))
+  assert.ok(!source.includes('/admin/payments/{order_id}/refund'))
+  assert.ok(source.includes('/admin/manual-payments/{order_id}/refund'))
 })
 
 test('a later auth rejection cannot erase an earlier uncertain financial effect',async()=>{

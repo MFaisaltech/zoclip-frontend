@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ArrowUpRight, LockKeyhole, Search, ShieldCheck, X } from 'lucide-react';
+import ManualPurchases from './manual-purchases';
 import type { User } from '@/lib/auth-api';
 import type { MediaSchemas } from '@/lib/media-api';
 import { useFinance, useFinancePage } from '@/lib/use-finance';
@@ -148,10 +149,10 @@ function Audits() {
 function Payments() {
     const resource = useFinancePage('payments');
     return <FinancePanel title="Payment monitoring" resource={resource}>
-    <p className="mb-4 text-xs text-[#8a857f]">Development sandbox records only. Merchant checkout, reconciliation and refunds are not activated here.</p>{!resource.data?.length ? <FinanceEmpty>No payment orders recorded.</FinanceEmpty> : resource.data.map(({ order, user_id, refund }) => <article key={order.id} className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#eeeae5] p-4">
+    <p className="mb-4 text-xs text-[#8a857f]">Manual purchases and historical sandbox records. Verify payments and completed external refunds in the Purchases tab.</p>{!resource.data?.length ? <FinanceEmpty>No payment orders recorded.</FinanceEmpty> : resource.data.map(({ order, user_id, refund }) => <article key={order.id} className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#eeeae5] p-4">
         <div>
         <p className="font-medium">{formatPaisa(order.amount_paisa)} · {order.credits} credits</p>
-        <p className="mt-1 text-xs text-[#8a857f]">Customer {short(user_id)} · Sandbox · {financeDate(order.created_at)}{refund ? ` · ${refund.unrecovered_credits} unrecovered credits` : ''}</p>
+        <p className="mt-1 text-xs text-[#8a857f]">Customer {short(user_id)} · {order.provider === 'manual' ? 'Verified manual payment' : 'Sandbox'} · {financeDate(order.created_at)}{refund ? ` · ${refund.unrecovered_credits} unrecovered credits` : ''}</p>
         </div>
         <FinanceBadge>{order.state}</FinanceBadge>
         </article>)}<FinancePager page={resource} cursor={resource.data?.length === 20 ? resource.data.at(-1)?.order.id : null}/></FinancePanel>;
@@ -331,6 +332,6 @@ function AdminContent({ user, onChanged }: {
     <ShieldCheck size={15}/> Administrator · {user.email}</div>{storageError && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{storageError}</p>}{pending && !action && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#f2efff] p-4 text-sm text-[#6558c8]">
         <p>A financial request needs resolution before another change.</p>
         <button className={financeAction} onClick={() => setShowPending(true)}>Resolve pending request</button>
-        </div>}<nav aria-label="Administration" className="flex gap-2 overflow-x-auto pb-2">{['Overview', 'Customers', 'Plans', 'Jobs', 'Payments', 'Audit trail'].map(value => <button key={value} className={`${financeAction} shrink-0 ${tab === value ? '!bg-[#28253a] !text-white' : ''}`} aria-current={tab === value ? 'page' : undefined} onClick={() => setTab(value)}>{value}</button>)}</nav>
-    <div key={`${tab}:${revision}`}>{tab === 'Overview' ? <Overview /> : tab === 'Customers' ? <Customers onAction={selectAction}/> : tab === 'Plans' ? <Plans onAction={selectAction}/> : tab === 'Jobs' ? <Jobs /> : tab === 'Payments' ? <Payments /> : <Audits />}</div>{(action || (pending && showPending)) && <FinancialAction key={pending?.key ?? (action?.kind === 'plan' ? action.plan.id : action?.customer.id)} adminId={user.id} action={action} pending={pending} onClose={close} onChanged={() => { setPending(null); setRevision(v => v + 1); onChanged(); }}/>}</div>;
+        </div>}<nav aria-label="Administration" className="flex gap-2 overflow-x-auto pb-2">{['Overview', 'Purchases', 'Customers', 'Plans', 'Jobs', 'Payments', 'Audit trail'].map(value => <button key={value} className={`${financeAction} shrink-0 ${tab === value ? '!bg-[#28253a] !text-white' : ''}`} aria-current={tab === value ? 'page' : undefined} onClick={() => setTab(value)}>{value}</button>)}</nav>
+    <div key={`${tab}:${revision}`}>{tab === 'Overview' ? <Overview /> : tab === 'Purchases' ? <ManualPurchases adminId={user.id}/> : tab === 'Customers' ? <Customers onAction={selectAction}/> : tab === 'Plans' ? <Plans onAction={selectAction}/> : tab === 'Jobs' ? <Jobs /> : tab === 'Payments' ? <Payments /> : <Audits />}</div>{(action || (pending && showPending)) && <FinancialAction key={pending?.key ?? (action?.kind === 'plan' ? action.plan.id : action?.customer.id)} adminId={user.id} action={action} pending={pending} onClose={close} onChanged={() => { setPending(null); setRevision(v => v + 1); onChanged(); }}/>}</div>;
 }

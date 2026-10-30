@@ -3,6 +3,14 @@ import { mediaApi } from './media-api';
 import { matches } from './workspace-api';
 import { mediaDefinitions, mediaDescriptors, type MediaSchemas } from './media-schema';
 type Change = {
+    operation: 'manualActivate';
+    resourceId: string;
+    body: MediaSchemas['ManualPaymentInput'];
+} | {
+    operation: 'manualRefund';
+    resourceId: string;
+    body: MediaSchemas['ManualRefundInput'];
+} | {
     operation: 'adjustCredits';
     resourceId: string;
     body: MediaSchemas['AdjustmentInput'];
@@ -27,7 +35,7 @@ export function readFinancialIntent(admin: string, storage: Storage): FinancialI
     if (!raw)
         return null;
     const value = JSON.parse(raw);
-    if (typeof value.uncertain !== 'boolean' || !['adjustCredits', 'configurePlan', 'grantAccess'].includes(value.operation) ||
+    if (typeof value.uncertain !== 'boolean' || !['adjustCredits', 'configurePlan', 'grantAccess', 'manualActivate', 'manualRefund'].includes(value.operation) ||
         !uuid.test(value.resourceId) || !uuid.test(value.key) ||
         !matches(mediaDescriptors[value.operation as FinancialIntent['operation']].request, value.body, mediaDefinitions))
         throw new AuthApiError(0, 'invalid_request');
@@ -50,7 +58,7 @@ export async function sendFinancialIntent(admin: string, intent: FinancialIntent
     // A crash or lost acknowledgement must keep the same key, even after a later rejection.
     const previouslyUncertain = saved!.uncertain;
     storage.setItem(storageKey(admin), JSON.stringify({...saved, uncertain: true}));
-    const params: Record<string, string> = intent.operation === 'configurePlan' ? { plan_id: intent.resourceId } : { user_id: intent.resourceId };
+    const params: Record<string, string> = intent.operation === 'configurePlan' ? { plan_id: intent.resourceId } : intent.operation === 'manualRefund' ? {order_id:intent.resourceId} : { user_id: intent.resourceId };
     // Success must pass the existing response schema before the pending key can be removed.
     try {
         const result = await api.call(intent.operation, { params, body: intent.body, key: intent.key, signal });

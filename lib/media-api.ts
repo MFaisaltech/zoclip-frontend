@@ -94,6 +94,7 @@ export function createMediaApi(options: {
       for (const [key, value] of Object.entries(args.query ?? {})) {
         if (!(descriptor.queries as readonly string[]).includes(key) ||
           (key === 'search' ? typeof value !== 'string' || value.length > 100 :
+            key === 'email' ? typeof value !== 'string' || value.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) :
             key.endsWith('_id') || ['cursor', 'before'].includes(key) ? !uuid.test(String(value)) :
               !Number.isSafeInteger(Number(value)) || Number(value) < 1 ||
                 (key === 'limit' && Number(value) > 100)))

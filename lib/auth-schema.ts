@@ -1,5 +1,5 @@
 // Generated from backend/docs/openapi.json. Do not edit.
-// Source SHA-256: b5031ab0bc1ebcfb1f61056d946a3275424351335f9d1b8941975ffabe2837a7
+// Source SHA-256: 38820ef09d17b3e09c6d5e81d8ba5235c66e8c52d03f2804dd7caca096c18e9a
 export interface AuthSchemas {
   "Problem": { "type": string; "title": string; "status": number; "code": string; "detail": string; "instance": string; "request_id": string }
   "CsrfResponse": { "csrf_token": string }

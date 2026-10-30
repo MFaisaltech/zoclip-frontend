@@ -1,5 +1,5 @@
 // Generated from backend/docs/openapi.json. Do not edit.
-// Source SHA-256: b5031ab0bc1ebcfb1f61056d946a3275424351335f9d1b8941975ffabe2837a7
+// Source SHA-256: 38820ef09d17b3e09c6d5e81d8ba5235c66e8c52d03f2804dd7caca096c18e9a
 export interface WorkspaceSchemas {
   "VideoView": { "id": string; "project_id": string; "state": string; "metadata_json": Record<string, unknown>; "created_at": string; "expires_at": string }
   "JobView": { "id": string; "video_id": string; "kind": string; "state": string; "error_code": string | null; "attempts": number; "created_at": string; "updated_at": string; "stage": string; "progress_percent": number | null; "estimated_credits": number | null; "heartbeat_at": string | null; "queue_position"?: null; "reservation_id": string | null }
@@ -728,7 +728,7 @@ export const workspaceDefinitions = {
       "credits_per_minute": {
         "type": "integer",
         "maximum": 1000000000000,
-        "minimum": 1,
+        "minimum": 0,
         "title": "Credits Per Minute"
       },
       "credits_per_output": {

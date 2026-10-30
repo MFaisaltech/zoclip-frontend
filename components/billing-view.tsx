@@ -58,7 +58,7 @@ export default function BillingView({ wallet, ledger, access, catalog }: {
                 <div>
                 <p className="font-medium">{formatPaisa(order.amount_paisa)} <span className="ml-2 text-xs text-[#8a857f]">{order.credits} credits</span>
                 </p>
-                <p className="mt-1 text-xs text-[#8a857f]">{financeDate(order.created_at)} · Development sandbox · No real money collected</p>
+                <p className="mt-1 text-xs text-[#8a857f]">{financeDate(order.created_at)} · {order.provider === 'manual' ? 'Independently verified manual purchase' : 'Development sandbox · No real money collected'}</p>
                 </div>
                 <FinanceBadge>{order.state}</FinanceBadge>
                 </article>)}</div>}<FinancePager page={orders} cursor={orders.data?.next_cursor}/>
@@ -66,8 +66,8 @@ export default function BillingView({ wallet, ledger, access, catalog }: {
     </> : <>
         <div className="rounded-2xl border border-[#e4defd] bg-[#f2efff] p-5">
         <p className="flex items-center gap-2 font-medium text-[#6558c8]">
-        <LockKeyhole size={16}/> Upgrades are not available yet</p>
-        <p className="mt-2 text-sm leading-6 text-[#77736e]">Compare the configured terms below. Merchant checkout will become available after payment verification and commercial approval. Viewing a plan does not change your access or grant credits.</p>
+        <LockKeyhole size={16}/> Buy via WhatsApp</p>
+        <p className="mt-2 text-sm leading-6 text-[#77736e]">Ask for verified payment instructions in WhatsApp. Send your registered email and payment screenshot; credits are activated only after independent admin verification. Selecting a plan does not grant credits.</p>
         </div>{catalog}{price && <FinancePanel title="Your applied usage rules" resource={overview}>
             <dl className="grid gap-x-10 gap-y-3 sm:grid-cols-2">{Object.entries(price.rules).map(([key, value]) => <div key={key} className="flex justify-between gap-4 text-sm">
                 <dt className="text-[#77736e]">{ruleLabels[key] ?? key}</dt>

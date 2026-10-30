@@ -1,5 +1,5 @@
 // Generated from backend/docs/openapi.json. Do not edit.
-// Source SHA-256: b5031ab0bc1ebcfb1f61056d946a3275424351335f9d1b8941975ffabe2837a7
+// Source SHA-256: 38820ef09d17b3e09c6d5e81d8ba5235c66e8c52d03f2804dd7caca096c18e9a
 export interface MediaSchemas {
   "UploadInput": { "size_bytes": number; "sha256": string; "rights_attested": true }
   "UploadView": { "id": string; "video_id": string; "state": string; "expected_bytes": number; "part_bytes": number; "expires_at": string; "received_parts"?: Array<number> }
@@ -31,6 +31,9 @@ export interface MediaSchemas {
   "PolicyView": { "id": string; "limits": MediaSchemas["BudgetLimits-Output"]; "breaker": boolean }
   "AuditPage": { "items": Array<MediaSchemas["AuditView"]>; "next_cursor"?: string | null }
   "StaffOrderView": { "order": MediaSchemas["OrderView"]; "user_id": string; "reference": string; "refund": MediaSchemas["RefundView"] | null }
+  "ManualUserView": { "id": string; "email": string; "verified": boolean; "status": string; "available_credits": number; "reserved_credits": number }
+  "ManualPaymentInput": { "price_version_id": string; "amount_paisa": number; "payment_reference": string; "independently_verified": true; "reason": string }
+  "ManualRefundInput": { "payment_reference": string; "independently_verified": true; "reason": string }
   "AdjustmentInput": { "amount": number; "reason": string }
   "TransactionView": { "id": string; "operation": string; "available_delta": number; "reserved_delta": number; "available_after": number; "reserved_after": number; "reservation_id": string | null; "created_at": string }
   "PlanVersionInput": { "price_paisa": number; "included_credits": number; "valid_days": 0 | 30; "approved"?: boolean; "rules": MediaSchemas["ConsumptionRules"]; "reason": string }
@@ -42,7 +45,7 @@ export interface MediaSchemas {
   "CaptionWord": { "text": string; "start_ms": number; "end_ms": number }
   "PlanView": { "id": string; "slug": string; "kind": string; "enabled": boolean; "currency"?: "PKR"; "auto_renews"?: false; "credit_expiry"?: "disabled"; "price": MediaSchemas["PriceView"] | null }
   "ReservationView": { "id": string; "job_id": string; "credits": number; "state": string; "created_at": string; "updated_at": string }
-  "OrderView": { "id": string; "price_version_id": string; "provider": string; "amount_paisa": number; "currency": "PKR"; "credits": number; "valid_days": number; "state": string; "expires_at": string; "paid_at": string | null; "created_at": string; "sandbox"?: true; "auto_renews"?: false }
+  "OrderView": { "id": string; "price_version_id": string; "provider": string; "amount_paisa": number; "currency": "PKR"; "credits": number; "valid_days": number; "state": string; "expires_at": string; "paid_at": string | null; "created_at": string; "sandbox"?: boolean; "auto_renews"?: false }
   "CustomerView": { "id": string; "email": string; "status": string; "verified": boolean; "created_at": string; "available_credits": number; "reserved_credits": number }
   "StaffJob": { "user_id": string; "job": MediaSchemas["JobView"] }
   "BudgetLimits-Output": { "per_job_usd": string; "user_daily_usd": string; "user_monthly_usd": string; "global_daily_usd": string; "global_monthly_usd": string; "max_open_reservations": number; "rate_ids": Array<string>; "input_tokens_per_second": number; "max_output_tokens": number; "render_cpu_seconds_per_output": number; "storage_gb_days_per_output": number; "max_attempts_per_job": number }
@@ -86,6 +89,9 @@ export interface MediaOperations {
   limits: { request: null; response: MediaSchemas["PolicyView"] | null }
   audits: { request: null; response: MediaSchemas["AuditPage"] }
   payments: { request: null; response: Array<MediaSchemas["StaffOrderView"]> }
+  manualUsers: { request: null; response: Array<MediaSchemas["ManualUserView"]> }
+  manualActivate: { request: MediaSchemas["ManualPaymentInput"]; response: MediaSchemas["StaffOrderView"] }
+  manualRefund: { request: MediaSchemas["ManualRefundInput"]; response: MediaSchemas["StaffOrderView"] }
   adjustCredits: { request: MediaSchemas["AdjustmentInput"]; response: MediaSchemas["TransactionView"] }
   configurePlan: { request: MediaSchemas["PlanVersionInput"]; response: MediaSchemas["PriceView"] }
   grantAccess: { request: MediaSchemas["EntitlementInput"]; response: MediaSchemas["EntitlementView"] }
@@ -648,6 +654,57 @@ export const mediaDescriptors = {
     "revisionHeader": false,
     "download": false,
     "idempotent": false,
+    "binary": false
+  },
+  "manualUsers": {
+    "path": "/api/v1/admin/manual-payments/users",
+    "method": "GET",
+    "response": {
+      "type": "array",
+      "items": {
+        "$ref": "#/components/schemas/ManualUserView"
+      },
+      "title": "Response Manual Users Api V1 Admin Manual Payments Users Get"
+    },
+    "request": {
+      "type": "null"
+    },
+    "queries": [
+      "email"
+    ],
+    "revisionHeader": false,
+    "download": false,
+    "idempotent": false,
+    "binary": false
+  },
+  "manualActivate": {
+    "path": "/api/v1/admin/manual-payments/users/{user_id}/activate",
+    "method": "POST",
+    "response": {
+      "$ref": "#/components/schemas/StaffOrderView"
+    },
+    "request": {
+      "$ref": "#/components/schemas/ManualPaymentInput"
+    },
+    "queries": [],
+    "revisionHeader": false,
+    "download": false,
+    "idempotent": true,
+    "binary": false
+  },
+  "manualRefund": {
+    "path": "/api/v1/admin/manual-payments/{order_id}/refund",
+    "method": "POST",
+    "response": {
+      "$ref": "#/components/schemas/StaffOrderView"
+    },
+    "request": {
+      "$ref": "#/components/schemas/ManualRefundInput"
+    },
+    "queries": [],
+    "revisionHeader": false,
+    "download": false,
+    "idempotent": true,
     "binary": false
   },
   "adjustCredits": {
@@ -1957,6 +2014,119 @@ export const mediaDefinitions = {
     ],
     "title": "StaffOrderView"
   },
+  "ManualUserView": {
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid",
+        "title": "Id"
+      },
+      "email": {
+        "type": "string",
+        "title": "Email"
+      },
+      "verified": {
+        "type": "boolean",
+        "title": "Verified"
+      },
+      "status": {
+        "type": "string",
+        "title": "Status"
+      },
+      "available_credits": {
+        "type": "integer",
+        "title": "Available Credits"
+      },
+      "reserved_credits": {
+        "type": "integer",
+        "title": "Reserved Credits"
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "id",
+      "email",
+      "verified",
+      "status",
+      "available_credits",
+      "reserved_credits"
+    ],
+    "title": "ManualUserView"
+  },
+  "ManualPaymentInput": {
+    "properties": {
+      "price_version_id": {
+        "type": "string",
+        "format": "uuid",
+        "title": "Price Version Id"
+      },
+      "amount_paisa": {
+        "type": "integer",
+        "maximum": 1000000000000,
+        "minimum": 1,
+        "title": "Amount Paisa"
+      },
+      "payment_reference": {
+        "type": "string",
+        "maxLength": 100,
+        "minLength": 6,
+        "pattern": "^[A-Za-z0-9 .:_-]+$",
+        "title": "Payment Reference"
+      },
+      "independently_verified": {
+        "type": "boolean",
+        "const": true,
+        "title": "Independently Verified"
+      },
+      "reason": {
+        "type": "string",
+        "maxLength": 500,
+        "minLength": 5,
+        "title": "Reason"
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "price_version_id",
+      "amount_paisa",
+      "payment_reference",
+      "independently_verified",
+      "reason"
+    ],
+    "title": "ManualPaymentInput"
+  },
+  "ManualRefundInput": {
+    "properties": {
+      "payment_reference": {
+        "type": "string",
+        "maxLength": 100,
+        "minLength": 6,
+        "pattern": "^[A-Za-z0-9]+$",
+        "title": "Payment Reference"
+      },
+      "independently_verified": {
+        "type": "boolean",
+        "const": true,
+        "title": "Independently Verified"
+      },
+      "reason": {
+        "type": "string",
+        "maxLength": 500,
+        "minLength": 5,
+        "title": "Reason"
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "payment_reference",
+      "independently_verified",
+      "reason"
+    ],
+    "title": "ManualRefundInput"
+  },
   "AdjustmentInput": {
     "properties": {
       "amount": {
@@ -2525,7 +2695,6 @@ export const mediaDefinitions = {
       },
       "sandbox": {
         "type": "boolean",
-        "const": true,
         "title": "Sandbox",
         "default": true
       },
@@ -2852,7 +3021,7 @@ export const mediaDefinitions = {
       "credits_per_minute": {
         "type": "integer",
         "maximum": 1000000000000,
-        "minimum": 1,
+        "minimum": 0,
         "title": "Credits Per Minute"
       },
       "credits_per_output": {

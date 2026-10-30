@@ -2,7 +2,7 @@ import {readFile, writeFile} from 'node:fs/promises'
 
 // Backend versioned terms are authoritative. No runtime dependency on the API.
 const catalog=JSON.parse(await readFile(new URL('../../backend/deploy/staging-catalog.json',import.meta.url),'utf8'))
-const packages=Object.entries(catalog.plans).map(([slug,terms])=>({
+const packages=Object.entries(catalog.plans).filter(([slug])=>slug in catalog.display).map(([slug,terms])=>({
   slug,name:catalog.display[slug].name,pricePaisa:terms.price_paisa,
   credits:terms.included_credits,bonusCredits:catalog.display[slug].bonus_credits,
   targetClips:catalog.display[slug].target_clips,
