@@ -16,12 +16,16 @@ type Phase = 'idle' | 'preparing' | 'quoting' | 'review' | 'submitting' | 'proce
 type Saved = {videoId?: string; job?: Job; request?: GenerationQuote; count: number}
 const input = 'w-full rounded-xl border border-[#dfdbe8] bg-white px-4 py-3.5 text-base outline-none transition focus:border-[#8270e4] focus:ring-4 focus:ring-[#8270e4]/10'
 const secondary = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#dfdbe8] bg-white px-4 py-2.5 text-sm font-medium text-[#625a76] hover:bg-[#f5f2ff] disabled:opacity-50'
-const privatePreview = process.env.NEXT_PUBLIC_PRIVATE_STAGING === 'true'
 
 export default function GenerationStudio({owner, visible, videoId, jobId, onJob, onChanged}: {
   owner: string; visible: boolean; videoId: string | null; jobId: string | null;
   onJob: (job: Job) => void; onChanged: () => void;
 }) {
+  // UX only: API admission and workers independently enforce the configured UUID.
+  const privatePreview = process.env.NEXT_PUBLIC_PRIVATE_STAGING === 'true' && !(
+    process.env.NEXT_PUBLIC_STAGING_GENERATION_ENABLED === 'true' &&
+    process.env.NEXT_PUBLIC_STAGING_GENERATION_USER_ID === owner
+  )
   const [mode, setMode] = useState<'youtube' | 'upload'>('youtube')
   const [url, setUrl] = useState(''), [file, setFile] = useState<File | null>(null)
   const [count, setCount] = useState(1), [maxCount, setMaxCount] = useState(3)
