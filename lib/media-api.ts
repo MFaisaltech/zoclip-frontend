@@ -24,6 +24,9 @@ export function mediaErrorMessage(error: unknown): string {
     quote_expired: 'Your price has expired. Refresh it before creating clips.',
     quote_stale: 'Pricing has changed. Refresh your price before creating clips.',
     unsupported_source: 'This link isn’t supported. Download the video and upload the file instead.',
+    unsupported_youtube_url: 'Paste a valid HTTPS YouTube video, Shorts, live recording or youtu.be link.',
+    link_download_failed: 'YouTube could not provide this video. Check that it is available to you, try again, or upload your own copy.',
+    upload_limit: 'Choose a nonempty MP4 or WebM video under 4 GB.',
     unsafe_source: 'We can’t import this link. Upload the video file instead.',
     upload_expired: 'Your saved upload has expired. Start a new upload.',
     upload_closed: 'This upload has finished or expired. Check your videos before starting again.',
@@ -149,7 +152,7 @@ export function createMediaApi(options: {
               Number.isFinite(retry) && retry > 0 ? Math.ceil(retry) : null)
           }
           if (!matches(descriptor.response, data, mediaDefinitions)) throw new AuthApiError(0, 'invalid_response')
-          if (['job', 'generate', 'complete', 'cancel', 'importUrl'].includes(name)) {
+          if (['job', 'generate', 'complete', 'cancel', 'importUrl', 'importLink'].includes(name)) {
             const job = data as MediaOperations['job']['response']
             if (job.attempts < 0 || (job.progress_percent !== null && (job.progress_percent < 0 || job.progress_percent > 100)) ||
               (job.estimated_credits !== null && job.estimated_credits < 0)) throw new AuthApiError(0, 'invalid_response')

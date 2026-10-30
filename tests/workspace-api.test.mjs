@@ -300,6 +300,19 @@ test('refresh discards older responses and clears old data while loading or on e
   assert.equal(resource.getSnapshot().data, null)
 })
 
+test('clip polling preserves visible cards until the refreshed list arrives', async () => {
+  const next = deferred()
+  let reads = 0
+  const resource = createWorkspaceResource('clips', {read: () => ++reads === 1 ? Promise.resolve([{id: 'clip-1'}]) : next.promise})
+  await resource.refresh()
+  const refresh = resource.refresh()
+  assert.deepEqual(resource.getSnapshot().data, [{id: 'clip-1'}])
+  assert.equal(resource.getSnapshot().status, 'ready')
+  next.resolve([{id: 'clip-2'}, {id: 'clip-1'}])
+  await refresh
+  assert.deepEqual(resource.getSnapshot().data.map(row => row.id), ['clip-2', 'clip-1'])
+})
+
 test('list pagination keeps data after a page error, retries the same cursor, and deduplicates records', async () => {
   const calls = []
   let attempt = 0

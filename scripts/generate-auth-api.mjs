@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 // Deliberately limited to Milestone 1. Fail on unsupported schema constructs.
 const source = new URL('../../backend/docs/openapi.json', import.meta.url)
 const target = new URL('../lib/auth-schema.ts', import.meta.url)
-const raw = await readFile(source, 'utf8')
+const raw = (await readFile(source, 'utf8')).replace(/\r\n/g, '\n')
 const api = JSON.parse(raw)
 const selected = [
   ['get', '/api/v1/auth/csrf'], ['get', '/api/v1/me'],
@@ -48,7 +48,7 @@ const limits = Object.fromEntries(['Credentials', 'TokenInput'].flatMap((name) =
 ))
 const result = `// Generated from backend/docs/openapi.json. Do not edit.\n// Source SHA-256: ${createHash('sha256').update(raw).digest('hex')}\nexport interface AuthSchemas {\n${schemas.join('\n')}\n}\n\nexport interface AuthOperations {\n${operations.join('\n')}\n}\n\nexport const authFieldLimits = ${JSON.stringify(limits, null, 2)} as const\n`
 if (process.argv.includes('--check')) {
-  if (await readFile(target, 'utf8') !== result) throw Error('Auth contract drift: run npm run api:generate')
+  if ((await readFile(target, 'utf8')).replace(/\r\n/g, '\n') !== result) throw Error('Auth contract drift: run npm run api:generate')
   console.log('Authentication types match backend OpenAPI')
 } else {
   await writeFile(target, result)

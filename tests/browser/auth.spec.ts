@@ -17,7 +17,8 @@ if (!/^http:\/\/localhost:\d+$/.test(api) || !resolve(state.mailbox).startsWith(
   throw Error('Browser tests require isolated loopback auth services')
 }
 const password = 'Local browser test password 47!'
-const workspace = (page: Page) => page.getByRole('status').filter({ hasText: 'Signed in as' })
+// The redesigned workspace displays the account identity in its sidebar/footer.
+const workspace = (page: Page) => page.getByText(/^[^\s@]+@example\.com$/)
 
 async function mailToken(email: string, purpose: string) {
   let found = ''
@@ -34,14 +35,14 @@ async function mailToken(email: string, purpose: string) {
 
 async function openLogin(page: Page) {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.getByRole('banner').getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible()
 }
 
 async function signIn(page: Page, email: string, value = password) {
   await page.getByLabel('Email address').fill(email)
   await page.getByLabel('Password', { exact: true }).fill(value)
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.locator('form').getByRole('button', { name: 'Sign in', exact: true }).click()
 }
 
 test('real registration, verification, login, reload, cross-tab logout and password recovery', async ({ page, context }) => {
@@ -63,10 +64,11 @@ test('real registration, verification, login, reload, cross-tab logout and passw
   await expect(page.locator('p[role=alert]')).toContainText('Check your email and password')
   await signIn(page, email)
   await expect(workspace(page)).toContainText(email)
-  await expect(page.getByTestId('available-credits')).toHaveText('0')
-  await expect(page.getByText('No videos in this account. Add your footage from the Videos tab.', { exact: true })).toBeVisible()
-  await expect(page.getByText('No jobs in this account.', { exact: true })).toBeVisible()
-  await expect(page.getByText('No clips in this account.', { exact: true })).toBeVisible()
+  expect((await (await page.request.get(`${api}/api/v1/me/credits`)).json()).available_credits).toBe(0)
+  await expect(page.getByRole('region', {name: 'Generate clips', exact: true})).toBeVisible()
+  await expect(page.getByRole('region', {name: 'Your Clips', exact: true})).toBeVisible()
+  for (const resource of ['videos', 'jobs', 'clips'])
+    expect(await (await page.request.get(`${api}/api/v1/${resource}`)).json()).toEqual([])
   const session = (await context.cookies(api)).find((cookie) => cookie.name === 'zoclip_session')
   // Test booleans only: never put a session cookie's value in assertion output.
   expect(Boolean(session?.httpOnly && session.sameSite === 'Lax' && session.path === '/')).toBe(true)
@@ -76,7 +78,14 @@ test('real registration, verification, login, reload, cross-tab logout and passw
   await page.reload()
   await expect(workspace(page)).toContainText(email)
   const other = await context.newPage()
+  if (process.env.ZOCLIP_BROWSER_DIAGNOSTICS === '1') {
+    other.on('response', response => {
+      if (new URL(response.url()).pathname === '/api/v1/me') console.log('Second-tab identity status:', response.status())
+    })
+    other.on('pageerror', error => console.log('Second-tab script error type:', error.name))
+  }
   await other.goto('/')
+  await other.bringToFront()
   await expect(workspace(other)).toContainText(email)
   await page.getByRole('button', { name: 'Log out', exact: true }).first().click()
   await expect(workspace(page)).toHaveCount(0)
@@ -111,7 +120,7 @@ test('real registration, verification, login, reload, cross-tab logout and passw
   await expect(page.getByText('Your session has expired. Please sign in again.', { exact: true })).toBeVisible()
   await expect(workspace(page)).toHaveCount(0)
   await page.getByRole('button', { name: 'Back to home' }).click()
-  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
 })
 
 test('real backend denies missing CSRF, forged Origin and anonymous workspace access', async ({ page, context }) => {
@@ -125,7 +134,7 @@ test('real backend denies missing CSRF, forged Origin and anonymous workspace ac
   } })
   expect(forged.status()).toBe(403)
   await page.goto('/')
-  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
   await expect(workspace(page)).toHaveCount(0)
 })
 
@@ -141,13 +150,15 @@ test('verification links remove fragments and show invalid/replayed token errors
 test('session service outages and malformed identities fail closed and allow retry', async ({ page }) => {
   await page.route(`${api}/api/v1/me`, (route) => route.fulfill({ status: 503, json: { code: 'dependency_unavailable' } }))
   await page.goto('/')
+  await page.getByRole('banner').getByRole('button', {name: 'Sign in', exact: true}).click()
   await expect(page.locator('p[role=alert]')).toContainText('temporarily unavailable')
   await expect(workspace(page)).toHaveCount(0)
   await page.unroute(`${api}/api/v1/me`)
   await page.getByRole('button', { name: 'Try again' }).click()
-  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', {name: 'Welcome back'})).toBeVisible()
   await page.route(`${api}/api/v1/me`, (route) => route.fulfill({ json: {} }))
   await page.reload()
+  await page.getByRole('banner').getByRole('button', {name: 'Sign in', exact: true}).click()
   await expect(page.locator('p[role=alert]')).toContainText('unexpected response')
   await expect(workspace(page)).toHaveCount(0)
 })
@@ -172,7 +183,7 @@ test('pending forms prevent duplicate submissions; rate limits and CSRF errors s
   await expect(page.locator('p[role=alert]')).toContainText('60 seconds')
   await page.unroute(`${api}/api/v1/auth/login`)
   await page.route(`${api}/api/v1/auth/login`, (route) => route.fulfill({ status: 403, json: { code: 'csrf_failed' } }))
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.locator('form').getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.locator('p[role=alert]')).toContainText('security session changed or expired')
   await expect(workspace(page)).toHaveCount(0)
 })

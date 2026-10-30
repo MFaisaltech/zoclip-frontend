@@ -1,10 +1,10 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 
-const raw = await readFile(
+const raw = (await readFile(
   new URL('../../backend/docs/openapi.json', import.meta.url),
   'utf8',
-)
+)).replace(/\r\n/g, '\n')
 const api = JSON.parse(raw)
 const selected = {
   initiate: ['post', '/api/v1/uploads'],
@@ -116,7 +116,7 @@ for (const name of required) {
 const result = `// Generated from backend/docs/openapi.json. Do not edit.\n// Source SHA-256: ${createHash('sha256').update(raw).digest('hex')}\nexport interface MediaSchemas {\n${schemas.join('\n')}\n}\nexport interface MediaOperations {\n${operations.join('\n')}\n}\nexport const mediaDescriptors = ${JSON.stringify(descriptors, null, 2)} as const\nexport const mediaDefinitions = ${JSON.stringify(definitions, null, 2)} as const\n`
 const target = new URL('../lib/media-schema.ts', import.meta.url)
 if (process.argv.includes('--check')) {
-  if ((await readFile(target, 'utf8')) !== result)
+  if ((await readFile(target, 'utf8')).replace(/\r\n/g, '\n') !== result)
     throw Error('Media contract drift: run npm run api:generate')
   console.log(
     'Media operations, request/response schemas and headers match backend OpenAPI',

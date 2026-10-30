@@ -84,7 +84,10 @@ export function createWorkspaceResource<K extends ResourceName>(
     const current = ++generation
     controller?.abort()
     controller = new AbortController()
-    set(more ? { ...previous, loadingMore: true, moreError: null } : initial)
+    // Keep the library visible while polling updates. Dropping existing data on
+    // every heartbeat unmounted previews and made completed clips disappear.
+    set(more ? { ...previous, loadingMore: true, moreError: null } :
+      name === 'clips' && previous.data ? { ...previous, error: null, moreError: null } : initial)
     try {
       const data = await api.read(name, cursor, controller.signal)
       if (current !== generation) return
