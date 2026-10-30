@@ -55,11 +55,11 @@ test('manual account lookup encodes exact email and rejects invalid email before
 
 test('manual activation retries the original key after a lost response and uses CSRF',async()=>{
   const storage=memory(),admin=id(9),seen=[]
-  const input={operation:'manualActivate',resourceId:id(1),body:{price_version_id:id(3),amount_paisa:100000,payment_reference:'BANK123456',independently_verified:true,reason:'Independently verified bank receipt'}}
+  const input={operation:'manualActivate',resourceId:id(1),body:{price_version_id:id(3),amount_paisa:100000,customer_name:'Alice Example',payment_reference:'BANK123456',independently_verified:true,reason:'Independently verified bank receipt'}}
   const intent=persistFinancialIntent(admin,input,storage)
   let offline=true
-  const order={id:id(4),price_version_id:id(3),provider:'manual',amount_paisa:100000,currency:'PKR',credits:10000,valid_days:0,state:'PAID',expires_at:'2099-01-01T00:00:00Z',paid_at:'2026-10-30T00:00:00Z',created_at:'2026-10-30T00:00:00Z',sandbox:false,auto_renews:false}
-  const api=createMediaApi({origin:'http://localhost:8000',authorize:fn=>fn('csrf-token'),fetch:async(url,options)=>{seen.push({url,options});if(offline)throw new Error('Lost response');return json({order,user_id:id(1),reference:'BANK123456',refund:null})}})
+  const order={id:id(4),price_version_id:id(3),provider:'manual',amount_paisa:100000,currency:'PKR',credits:10000,valid_days:30,state:'PAID',expires_at:'2099-01-01T00:00:00Z',paid_at:'2026-10-30T00:00:00Z',created_at:'2026-10-30T00:00:00Z',sandbox:false,auto_renews:false}
+  const api=createMediaApi({origin:'http://localhost:8000',authorize:fn=>fn('csrf-token'),fetch:async(url,options)=>{seen.push({url,options});if(offline)throw new Error('Lost response');return json({order,user_id:id(1),customer_email:'alice@example.com',customer_name:'Alice Example',plan_slug:'creator',access_starts_at:'2026-10-30T00:00:00Z',access_ends_at:'2026-11-29T00:00:00Z',reference:'BANK123456',refund:null})}})
   await assert.rejects(sendFinancialIntent(admin,intent,storage,api))
   assert.equal(readFinancialIntent(admin,storage).key,intent.key)
   assert.throws(()=>persistFinancialIntent(admin,input,storage))

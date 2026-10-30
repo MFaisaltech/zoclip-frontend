@@ -28,7 +28,7 @@ export default function GenerationStudio({owner, visible, videoId, jobId, onJob,
   )
   const [mode, setMode] = useState<'youtube' | 'upload'>('youtube')
   const [url, setUrl] = useState(''), [file, setFile] = useState<File | null>(null)
-  const [count, setCount] = useState(1), [maxCount, setMaxCount] = useState(3)
+  const [count, setCount] = useState(1), [maxCount, setMaxCount] = useState(6)
   const [phase, setPhase] = useState<Phase>('idle'), [sourceId, setSourceId] = useState<string | null>(null)
   const [job, setJob] = useState<Job | null>(null), [request, setRequest] = useState<GenerationQuote | null>(null)
   const [balance, setBalance] = useState<number | null>(null), [error, setError] = useState<unknown>(null)
@@ -75,7 +75,7 @@ export default function GenerationStudio({owner, visible, videoId, jobId, onJob,
       const pendingImport = JSON.parse(sessionStorage.getItem(storageKey + ':import') ?? 'null')
       if (pendingImport && typeof pendingImport.url === 'string' && /^[\w.:-]{1,128}$/.test(pendingImport.key))
         importAttempt.current = {url: canonicalYouTubeUrl(pendingImport.url), key: pendingImport.key}
-      if (saved && Number.isInteger(saved.count) && saved.count >= 1 && saved.count <= 3) {
+      if (saved && Number.isInteger(saved.count) && saved.count >= 1 && saved.count <= 6) {
         setCount(saved.count)
         if (saved.job && matches({$ref: '#/components/schemas/JobView'}, saved.job, mediaDefinitions)) {
           setJob(saved.job); setPhase(saved.job.kind === 'PROCESS' ? 'processing' : 'preparing')
@@ -147,7 +147,7 @@ export default function GenerationStudio({owner, visible, videoId, jobId, onJob,
           workspaceApi.read('wallet', undefined, controller.signal), mediaApi.call('billingOverview', {signal: controller.signal}),
         ])
         setBalance(wallet.available_credits)
-        const maximum = Math.min(3, billing.plan?.price?.rules.max_outputs ?? 3)
+        const maximum = Math.min(6, billing.plan?.price?.rules.max_outputs ?? 6)
         setMaxCount(maximum)
         if (count > maximum) {setCount(maximum); throw new AuthApiError(422, 'plan_limit')}
         const minimum = billing.plan?.price?.rules.minimum_job_credits ?? 1

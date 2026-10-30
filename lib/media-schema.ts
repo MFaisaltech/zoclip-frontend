@@ -1,5 +1,5 @@
 // Generated from backend/docs/openapi.json. Do not edit.
-// Source SHA-256: 38820ef09d17b3e09c6d5e81d8ba5235c66e8c52d03f2804dd7caca096c18e9a
+// Source SHA-256: e3baa3ccd97e9246a2a44f75cb939a1909af4ebfb46d08999059972d6f7b718d
 export interface MediaSchemas {
   "UploadInput": { "size_bytes": number; "sha256": string; "rights_attested": true }
   "UploadView": { "id": string; "video_id": string; "state": string; "expected_bytes": number; "part_bytes": number; "expires_at": string; "received_parts"?: Array<number> }
@@ -7,7 +7,7 @@ export interface MediaSchemas {
   "JobView": { "id": string; "video_id": string; "kind": string; "state": string; "error_code": string | null; "attempts": number; "created_at": string; "updated_at": string; "stage": string; "progress_percent": number | null; "estimated_credits": number | null; "heartbeat_at": string | null; "queue_position"?: null; "reservation_id": string | null }
   "ImportInput": { "url": string; "max_bytes": number; "rights_attested": true }
   "LinkImportInput": { "url": string; "rights_attested": true }
-  "QuoteInput": { "source_seconds": number; "output_count": number; "edit_count"?: number; "captions"?: boolean; "reframe"?: boolean }
+  "GenerationQuoteInput": { "source_seconds": number; "output_count": number; "edit_count"?: number; "captions"?: boolean; "reframe"?: boolean }
   "QuoteView": { "id": string; "price_version_id": string; "credits": number; "request": MediaSchemas["QuoteInput"]; "expires_at": string }
   "QuotePreviewView": { "preview_only"?: true; "processing_enabled"?: false; "pricing_status": "unconfigured" | "unapproved" | "configured"; "price_version_id": string | null; "credits": number | null; "request": MediaSchemas["QuoteInput"] }
   "GenerateInput": { "quote_id": string; "auto_render"?: boolean }
@@ -30,9 +30,9 @@ export interface MediaSchemas {
   "UsageView": { "estimated_usd": string; "actual_usd": string; "held_or_unknown_usd": string; "attempts": number }
   "PolicyView": { "id": string; "limits": MediaSchemas["BudgetLimits-Output"]; "breaker": boolean }
   "AuditPage": { "items": Array<MediaSchemas["AuditView"]>; "next_cursor"?: string | null }
-  "StaffOrderView": { "order": MediaSchemas["OrderView"]; "user_id": string; "reference": string; "refund": MediaSchemas["RefundView"] | null }
+  "StaffOrderView": { "order": MediaSchemas["OrderView"]; "user_id": string; "reference": string; "refund": MediaSchemas["RefundView"] | null; "customer_email": string; "customer_name": string | null; "plan_slug": string; "access_starts_at": string | null; "access_ends_at": string | null }
   "ManualUserView": { "id": string; "email": string; "verified": boolean; "status": string; "available_credits": number; "reserved_credits": number }
-  "ManualPaymentInput": { "price_version_id": string; "amount_paisa": number; "payment_reference": string; "independently_verified": true; "reason": string }
+  "ManualPaymentInput": { "price_version_id": string; "amount_paisa": number; "customer_name": string; "payment_reference": string; "independently_verified": true; "reason": string }
   "ManualRefundInput": { "payment_reference": string; "independently_verified": true; "reason": string }
   "AdjustmentInput": { "amount": number; "reason": string }
   "TransactionView": { "id": string; "operation": string; "available_delta": number; "reserved_delta": number; "available_after": number; "reserved_after": number; "reservation_id": string | null; "created_at": string }
@@ -40,13 +40,14 @@ export interface MediaSchemas {
   "PriceView": { "id": string; "price_paisa": number; "included_credits": number; "valid_days": number; "approved": boolean; "rules": MediaSchemas["ConsumptionRules"] }
   "EntitlementInput": { "price_version_id": string; "reason": string }
   "EntitlementView": { "id": string; "price_version_id": string; "starts_at": string; "ends_at": string | null; "active": boolean }
+  "QuoteInput": { "source_seconds": number; "output_count": number; "edit_count"?: number; "captions"?: boolean; "reframe"?: boolean }
   "TranscriptData": { "text": string; "words": Array<MediaSchemas["Word"]>; "confidence": number; "duration_seconds": number; "utterances"?: Array<Record<string, unknown>> }
   "SuggestionView": { "start_sec": number; "end_sec": number; "title": string; "hook": string; "reason": string; "score": number; "keywords": Array<string>; "hashtags": Array<string>; "id": string; "rank": number; "job_id": string; "transcript_id": string }
   "CaptionWord": { "text": string; "start_ms": number; "end_ms": number }
   "PlanView": { "id": string; "slug": string; "kind": string; "enabled": boolean; "currency"?: "PKR"; "auto_renews"?: false; "credit_expiry"?: "disabled"; "price": MediaSchemas["PriceView"] | null }
   "ReservationView": { "id": string; "job_id": string; "credits": number; "state": string; "created_at": string; "updated_at": string }
   "OrderView": { "id": string; "price_version_id": string; "provider": string; "amount_paisa": number; "currency": "PKR"; "credits": number; "valid_days": number; "state": string; "expires_at": string; "paid_at": string | null; "created_at": string; "sandbox"?: boolean; "auto_renews"?: false }
-  "CustomerView": { "id": string; "email": string; "status": string; "verified": boolean; "created_at": string; "available_credits": number; "reserved_credits": number }
+  "CustomerView": { "id": string; "email": string; "name": string | null; "role": string; "status": string; "verified": boolean; "created_at": string; "available_credits": number; "reserved_credits": number; "plan_slug": string | null; "access_ends_at": string | null }
   "StaffJob": { "user_id": string; "job": MediaSchemas["JobView"] }
   "BudgetLimits-Output": { "per_job_usd": string; "user_daily_usd": string; "user_monthly_usd": string; "global_daily_usd": string; "global_monthly_usd": string; "max_open_reservations": number; "rate_ids": Array<string>; "input_tokens_per_second": number; "max_output_tokens": number; "render_cpu_seconds_per_output": number; "storage_gb_days_per_output": number; "max_attempts_per_job": number }
   "AuditView": { "id": string; "actor_id": string | null; "action": string; "target_id": string | null; "request_id": string; "created_at": string }
@@ -62,8 +63,8 @@ export interface MediaOperations {
   deleteUpload: { request: null; response: null }
   importUrl: { request: MediaSchemas["ImportInput"]; response: MediaSchemas["JobView"] }
   importLink: { request: MediaSchemas["LinkImportInput"]; response: MediaSchemas["JobView"] }
-  quote: { request: MediaSchemas["QuoteInput"]; response: MediaSchemas["QuoteView"] }
-  quotePreview: { request: MediaSchemas["QuoteInput"]; response: MediaSchemas["QuotePreviewView"] }
+  quote: { request: MediaSchemas["GenerationQuoteInput"]; response: MediaSchemas["QuoteView"] }
+  quotePreview: { request: MediaSchemas["GenerationQuoteInput"]; response: MediaSchemas["QuotePreviewView"] }
   generate: { request: MediaSchemas["GenerateInput"]; response: MediaSchemas["JobView"] }
   video: { request: null; response: MediaSchemas["VideoView"] }
   job: { request: null; response: MediaSchemas["JobView"] }
@@ -209,7 +210,7 @@ export const mediaDescriptors = {
       "$ref": "#/components/schemas/QuoteView"
     },
     "request": {
-      "$ref": "#/components/schemas/QuoteInput"
+      "$ref": "#/components/schemas/GenerationQuoteInput"
     },
     "queries": [],
     "revisionHeader": false,
@@ -224,7 +225,7 @@ export const mediaDescriptors = {
       "$ref": "#/components/schemas/QuotePreviewView"
     },
     "request": {
-      "$ref": "#/components/schemas/QuoteInput"
+      "$ref": "#/components/schemas/GenerationQuoteInput"
     },
     "queries": [],
     "revisionHeader": false,
@@ -1028,7 +1029,7 @@ export const mediaDefinitions = {
     ],
     "title": "LinkImportInput"
   },
-  "QuoteInput": {
+  "GenerationQuoteInput": {
     "properties": {
       "source_seconds": {
         "type": "integer",
@@ -1038,7 +1039,7 @@ export const mediaDefinitions = {
       },
       "output_count": {
         "type": "integer",
-        "maximum": 100,
+        "maximum": 6,
         "minimum": 1,
         "title": "Output Count"
       },
@@ -1066,7 +1067,8 @@ export const mediaDefinitions = {
       "source_seconds",
       "output_count"
     ],
-    "title": "QuoteInput"
+    "title": "GenerationQuoteInput",
+    "description": "Customer-facing generation quotes: the product sells 1-6 clips per job.\n\nInternal pricing math (calculate) keeps the wider QuoteInput bound; only\nthe quote endpoints customers actually confirm are capped at 6 outputs."
   },
   "QuoteView": {
     "properties": {
@@ -2002,6 +2004,49 @@ export const mediaDefinitions = {
             "type": "null"
           }
         ]
+      },
+      "customer_email": {
+        "type": "string",
+        "title": "Customer Email"
+      },
+      "customer_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Customer Name"
+      },
+      "plan_slug": {
+        "type": "string",
+        "title": "Plan Slug"
+      },
+      "access_starts_at": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Access Starts At"
+      },
+      "access_ends_at": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Access Ends At"
       }
     },
     "additionalProperties": false,
@@ -2010,7 +2055,12 @@ export const mediaDefinitions = {
       "order",
       "user_id",
       "reference",
-      "refund"
+      "refund",
+      "customer_email",
+      "customer_name",
+      "plan_slug",
+      "access_starts_at",
+      "access_ends_at"
     ],
     "title": "StaffOrderView"
   },
@@ -2067,6 +2117,12 @@ export const mediaDefinitions = {
         "minimum": 1,
         "title": "Amount Paisa"
       },
+      "customer_name": {
+        "type": "string",
+        "maxLength": 120,
+        "minLength": 2,
+        "title": "Customer Name"
+      },
       "payment_reference": {
         "type": "string",
         "maxLength": 100,
@@ -2091,6 +2147,7 @@ export const mediaDefinitions = {
     "required": [
       "price_version_id",
       "amount_paisa",
+      "customer_name",
       "payment_reference",
       "independently_verified",
       "reason"
@@ -2362,6 +2419,46 @@ export const mediaDefinitions = {
       "active"
     ],
     "title": "EntitlementView"
+  },
+  "QuoteInput": {
+    "properties": {
+      "source_seconds": {
+        "type": "integer",
+        "maximum": 7200,
+        "minimum": 1,
+        "title": "Source Seconds"
+      },
+      "output_count": {
+        "type": "integer",
+        "maximum": 100,
+        "minimum": 1,
+        "title": "Output Count"
+      },
+      "edit_count": {
+        "type": "integer",
+        "maximum": 100,
+        "minimum": 0,
+        "title": "Edit Count",
+        "default": 0
+      },
+      "captions": {
+        "type": "boolean",
+        "title": "Captions",
+        "default": true
+      },
+      "reframe": {
+        "type": "boolean",
+        "title": "Reframe",
+        "default": true
+      }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+      "source_seconds",
+      "output_count"
+    ],
+    "title": "QuoteInput"
   },
   "TranscriptData": {
     "properties": {
@@ -2733,6 +2830,21 @@ export const mediaDefinitions = {
         "type": "string",
         "title": "Email"
       },
+      "name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Name"
+      },
+      "role": {
+        "type": "string",
+        "title": "Role"
+      },
       "status": {
         "type": "string",
         "title": "Status"
@@ -2753,6 +2865,29 @@ export const mediaDefinitions = {
       "reserved_credits": {
         "type": "integer",
         "title": "Reserved Credits"
+      },
+      "plan_slug": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Plan Slug"
+      },
+      "access_ends_at": {
+        "anyOf": [
+          {
+            "type": "string",
+            "format": "date-time"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Access Ends At"
       }
     },
     "additionalProperties": false,
@@ -2760,11 +2895,15 @@ export const mediaDefinitions = {
     "required": [
       "id",
       "email",
+      "name",
+      "role",
       "status",
       "verified",
       "created_at",
       "available_credits",
-      "reserved_credits"
+      "reserved_credits",
+      "plan_slug",
+      "access_ends_at"
     ],
     "title": "CustomerView"
   },

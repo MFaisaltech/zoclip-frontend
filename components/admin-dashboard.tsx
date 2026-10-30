@@ -87,18 +87,20 @@ function CustomerTable({ search, onAction }: {
     const resource = useFinancePage('customers', { search }), [selected, setSelected] = useState<Customer | null>(null);
     return <div className="space-y-5">
     <FinancePanel title="Customers" resource={resource}>{!resource.data?.items.length ? <FinanceEmpty>No customers match this search.</FinanceEmpty> : <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] text-left text-sm">
+        <table className="w-full min-w-[860px] text-left text-sm">
         <thead className="text-xs text-[#8a857f]">
-        <tr>{['Customer', 'Available / reserved', 'Status', 'Manage'].map(x => <th scope="col" className="pb-3 font-medium" key={x}>{x}</th>)}</tr>
+        <tr>{['Customer', 'Plan', 'Available / reserved', 'Access ends', 'Status', 'Manage'].map(x => <th scope="col" className="pb-3 font-medium" key={x}>{x}</th>)}</tr>
         </thead>
         <tbody>{resource.data.items.map(customer => <tr className="border-t border-[#eeeae5]" key={customer.id}>
             <td className="py-4 pr-4">
-            <p className="font-medium">{customer.email}</p>
-            <p className="mt-1 text-xs text-[#8a857f]">Joined {financeDate(customer.created_at)} · {customer.verified ? 'Verified' : 'Unverified'}</p>
+            <p className="font-medium">{customer.name ?? customer.email}</p>
+            <p className="mt-1 text-xs text-[#8a857f]">{customer.name ? `${customer.email} · ` : ''}Joined {financeDate(customer.created_at)} · {customer.verified ? 'Verified' : 'Unverified'}</p>
             </td>
+            <td className="pr-4 capitalize">{customer.plan_slug ?? '—'}</td>
             <td className="tabular-nums">{customer.available_credits} / {customer.reserved_credits}</td>
+            <td className="pr-4">{customer.access_ends_at ? financeDate(customer.access_ends_at) : '—'}</td>
             <td>
-            <FinanceBadge>{customer.status}</FinanceBadge>
+            <FinanceBadge>{customer.status}</FinanceBadge>{customer.role === 'admin' && <span className="ml-2"><FinanceBadge>Admin</FinanceBadge></span>}
             </td>
             <td className="py-3">
             <div className="flex flex-wrap gap-2">
@@ -146,16 +148,91 @@ function Audits() {
             </article>)}</div>}<FinancePager page={resource} cursor={resource.data?.next_cursor}/>
     </FinancePanel>;
 }
-function Payments() {
+const manualStorage = {getItem:(key:string)=>sessionStorage.getItem(`manual:${key}`),setItem:(key:string,value:string)=>sessionStorage.setItem(`manual:${key}`,value),removeItem:(key:string)=>sessionStorage.removeItem(`manual:${key}`)};
+type PaymentRow = MediaSchemas['StaffOrderView'];
+function PaymentDetails({ row, adminId, onChanged }: {
+    row: PaymentRow;
+    adminId: string;
+    onChanged: () => void;
+}) {
+    const [reference, setReference] = useState(''), [notes, setNotes] = useState(''), [verified, setVerified] = useState(false);
+    const [busy, setBusy] = useState(false), [error, setError] = useState(''), [done, setDone] = useState(false);
+    const { order, refund } = row;
+    const refundable = order.provider === 'manual' && order.state === 'PAID' && !refund;
+    async function recordRefund(event: FormEvent) {
+        event.preventDefault(); setBusy(true); setError('');
+        try {
+            const saved = persistFinancialIntent(adminId, { operation: 'manualRefund', resourceId: order.id, body: { payment_reference: reference.toUpperCase().replace(/[^A-Z0-9]/g, ''), independently_verified: true, reason: notes } }, manualStorage);
+            await sendFinancialIntent(adminId, saved, manualStorage);
+            setDone(true); onChanged();
+        } catch (cause) { setError(financeError(cause)); } finally { setBusy(false); }
+    }
+    return <div className="space-y-4 py-4 text-sm">
+        <dl className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+        {[['Order ID', order.id], ['Customer ID', row.user_id], ['Provider', order.provider === 'manual' ? 'Verified manual payment' : 'Sandbox'], ['Payment reference', row.reference], ['Price version', order.price_version_id], ['Recorded', financeDate(order.created_at)], ['Order window ends', financeDate(order.expires_at)], ['Plan term', order.valid_days ? `${order.valid_days} days` : 'No timed access']].map(([label, value]) => <div className="flex justify-between gap-4" key={label}>
+            <dt className="text-[#8a857f]">{label}</dt>
+            <dd className="break-all text-right font-mono text-xs">{value}</dd>
+            </div>)}
+        </dl>
+        {refund && <p className="rounded-xl bg-[#faf9fc] p-3 text-xs leading-5 text-[#77736e]">Refund recorded: {refund.unrecovered_credits} unrecovered credits. The ledger and audit trail keep the full history.</p>}
+        {refundable && (done ? <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-900">Verified refund recorded. Balances and access were reversed from the ledger.</p> : <form onSubmit={event => { void recordRefund(event); }} className="space-y-3 rounded-xl border border-[#eeeae5] p-4">
+            <p className="font-medium">Record a verified full refund</p>
+            <p className="text-xs leading-5 text-[#8a857f]">Only after the refund is completed externally and verified in the bank or wallet. If a saved request is pending, resolve it in the Purchases tab instead.</p>
+            <label htmlFor={`refund-reference-${order.id}`} className="block text-sm">Refund transaction reference<input id={`refund-reference-${order.id}`} required minLength={6} maxLength={100} pattern="[A-Za-z0-9]+" className={financeInput} value={reference} onChange={event => setReference(event.target.value)}/></label>
+            <label htmlFor={`refund-notes-${order.id}`} className="block text-sm">Verification notes<input id={`refund-notes-${order.id}`} required minLength={5} maxLength={500} className={financeInput} value={notes} onChange={event => setNotes(event.target.value)}/></label>
+            <label htmlFor={`refund-verified-${order.id}`} className="flex items-start gap-3 text-sm"><input id={`refund-verified-${order.id}`} type="checkbox" required checked={verified} onChange={event => setVerified(event.target.checked)}/>I independently verified this completed refund in the bank or wallet.</label>
+            {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
+            <button className={financeAction} disabled={busy || !verified}>{busy ? 'Recording…' : 'Record verified refund'}</button>
+            </form>)}
+    </div>;
+}
+function Payments({ adminId }: {
+    adminId: string;
+}) {
     const resource = useFinancePage('payments');
-    return <FinancePanel title="Payment monitoring" resource={resource}>
-    <p className="mb-4 text-xs text-[#8a857f]">Manual purchases and historical sandbox records. Verify payments and completed external refunds in the Purchases tab.</p>{!resource.data?.length ? <FinanceEmpty>No payment orders recorded.</FinanceEmpty> : resource.data.map(({ order, user_id, refund }) => <article key={order.id} className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#eeeae5] p-4">
-        <div>
-        <p className="font-medium">{formatPaisa(order.amount_paisa)} · {order.credits} credits</p>
-        <p className="mt-1 text-xs text-[#8a857f]">Customer {short(user_id)} · {order.provider === 'manual' ? 'Verified manual payment' : 'Sandbox'} · {financeDate(order.created_at)}{refund ? ` · ${refund.unrecovered_credits} unrecovered credits` : ''}</p>
-        </div>
-        <FinanceBadge>{order.state}</FinanceBadge>
-        </article>)}<FinancePager page={resource} cursor={resource.data?.length === 20 ? resource.data.at(-1)?.order.id : null}/></FinancePanel>;
+    const [query, setQuery] = useState(''), [openId, setOpenId] = useState<string | null>(null);
+    const needle = query.trim().toLowerCase();
+    const rows = (resource.data ?? []).filter(row => !needle || [row.customer_name ?? '', row.customer_email, row.plan_slug, row.order.state].some(value => value.toLowerCase().includes(needle)));
+    return <div className="space-y-5">
+    <form onSubmit={event => event.preventDefault()} className="flex gap-2">
+    <label className="flex-1" htmlFor="payment-search">
+    <span className="sr-only">Search payments</span>
+    <input id="payment-search" className={financeInput} maxLength={100} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search by customer, email or plan"/>
+    </label>
+    </form>
+    <FinancePanel title="Payments" resource={resource}>
+    <p className="mb-4 text-xs text-[#8a857f]">Manual purchases and historical sandbox records. Open a payment for its technical details or to record a verified refund.</p>{!rows.length ? <FinanceEmpty>{needle ? 'No payments match this search.' : 'No payment orders recorded.'}</FinanceEmpty> : <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left text-sm">
+        <thead className="text-xs text-[#8a857f]">
+        <tr>{['Customer', 'Plan', 'Amount paid', 'Credits granted', 'Activation date', 'Expiration date', 'Payment status', ''].map((x, i) => <th scope="col" className="pb-3 font-medium" key={i}>{x}</th>)}</tr>
+        </thead>
+        {rows.map(row => <tbody key={row.order.id}>
+            <tr className="border-t border-[#eeeae5]">
+            <td className="py-4 pr-4">
+            <p className="font-medium">{row.customer_name ?? row.customer_email}</p>
+            <p className="mt-1 text-xs text-[#8a857f]">{row.customer_name ? row.customer_email : (row.order.provider === 'manual' ? 'Verified manual payment' : 'Sandbox')}</p>
+            </td>
+            <td className="pr-4 capitalize">{row.plan_slug || '—'}</td>
+            <td className="tabular-nums">{formatPaisa(row.order.amount_paisa)}</td>
+            <td className="tabular-nums">{row.order.credits.toLocaleString()}</td>
+            <td className="pr-4">{row.order.paid_at ? financeDate(row.order.paid_at) : '—'}</td>
+            <td className="pr-4">{row.access_ends_at ? financeDate(row.access_ends_at) : (row.order.valid_days ? '—' : 'No expiry')}</td>
+            <td>
+            <FinanceBadge>{row.order.state}</FinanceBadge>{row.refund && <p className="mt-1 text-xs text-[#8a857f]">Refunded</p>}
+            </td>
+            <td className="py-3">
+            <button className={financeAction} onClick={() => setOpenId(openId === row.order.id ? null : row.order.id)}>{openId === row.order.id ? 'Hide' : 'Details'}</button>
+            </td>
+            </tr>
+            {openId === row.order.id && <tr className="border-t border-[#f4f1ec]">
+            <td colSpan={8}>
+            <PaymentDetails row={row} adminId={adminId} onChanged={() => { void resource.refresh(); }}/>
+            </td>
+            </tr>}
+        </tbody>)}
+        </table>
+        </div>}<FinancePager page={resource} cursor={resource.data?.length === 20 ? resource.data.at(-1)?.order.id : null}/></FinancePanel>
+    </div>;
 }
 function FinancialAction({ adminId, action, pending, onClose, onChanged }: {
     adminId: string;
@@ -333,5 +410,5 @@ function AdminContent({ user, onChanged }: {
         <p>A financial request needs resolution before another change.</p>
         <button className={financeAction} onClick={() => setShowPending(true)}>Resolve pending request</button>
         </div>}<nav aria-label="Administration" className="flex gap-2 overflow-x-auto pb-2">{['Overview', 'Purchases', 'Customers', 'Plans', 'Jobs', 'Payments', 'Audit trail'].map(value => <button key={value} className={`${financeAction} shrink-0 ${tab === value ? '!bg-[#28253a] !text-white' : ''}`} aria-current={tab === value ? 'page' : undefined} onClick={() => setTab(value)}>{value}</button>)}</nav>
-    <div key={`${tab}:${revision}`}>{tab === 'Overview' ? <Overview /> : tab === 'Purchases' ? <ManualPurchases adminId={user.id}/> : tab === 'Customers' ? <Customers onAction={selectAction}/> : tab === 'Plans' ? <Plans onAction={selectAction}/> : tab === 'Jobs' ? <Jobs /> : tab === 'Payments' ? <Payments /> : <Audits />}</div>{(action || (pending && showPending)) && <FinancialAction key={pending?.key ?? (action?.kind === 'plan' ? action.plan.id : action?.customer.id)} adminId={user.id} action={action} pending={pending} onClose={close} onChanged={() => { setPending(null); setRevision(v => v + 1); onChanged(); }}/>}</div>;
+    <div key={`${tab}:${revision}`}>{tab === 'Overview' ? <Overview /> : tab === 'Purchases' ? <ManualPurchases adminId={user.id}/> : tab === 'Customers' ? <Customers onAction={selectAction}/> : tab === 'Plans' ? <Plans onAction={selectAction}/> : tab === 'Jobs' ? <Jobs /> : tab === 'Payments' ? <Payments adminId={user.id}/> : <Audits />}</div>{(action || (pending && showPending)) && <FinancialAction key={pending?.key ?? (action?.kind === 'plan' ? action.plan.id : action?.customer.id)} adminId={user.id} action={action} pending={pending} onClose={close} onChanged={() => { setPending(null); setRevision(v => v + 1); onChanged(); }}/>}</div>;
 }
