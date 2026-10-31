@@ -12,7 +12,7 @@ export async function quoteForVideo(videoId: string, count: number, signal: Abor
   const duration = source.metadata_json.duration_seconds
   if (source.state !== 'READY' || typeof duration !== 'number' || !Number.isSafeInteger(duration) || duration < 1)
     throw new AuthApiError(409, 'source_not_ready')
-  if (!Number.isInteger(count) || count < 1 || count > Math.min(3, billing.plan?.price?.rules.max_outputs ?? 3))
+  if (!Number.isInteger(count) || count < 1 || count > Math.min(6, billing.plan?.price?.rules.max_outputs ?? 6))
     throw new AuthApiError(422, 'plan_limit')
   const body = {source_seconds: duration, output_count: count, edit_count: 0, captions: true, reframe: true}
   // Quotes do not reserve or settle credits. The server rechecks all rules on confirm.

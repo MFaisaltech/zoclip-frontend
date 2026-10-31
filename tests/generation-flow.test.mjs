@@ -80,3 +80,18 @@ test('confirmation and uncertain retries use the same quote, render flag and ide
     assert.deepEqual(call.args.body, {quote_id: id, auto_render: true})
   }
 })
+
+test('25-minute sources allow six clips only when the actual entitlement allows six', async () => {
+  let limit = 6, submitted = 0
+  const api = {call: async name => {
+    if (name === 'video') return {state: 'READY', metadata_json: {duration_seconds: 1530}}
+    if (name === 'billingOverview') return {plan: {price: {rules: {max_outputs: limit}}}}
+    if (name === 'quote') {submitted++; return quote}
+    assert.fail('unexpected operation')
+  }}
+  await quoteForVideo(id, 6, new AbortController().signal, api, async () => ({available_credits: 10000}))
+  assert.equal(submitted, 1)
+  limit = 3
+  await assert.rejects(quoteForVideo(id, 4, new AbortController().signal, api, async () => ({available_credits: 10000})), {code: 'plan_limit'})
+  assert.equal(submitted, 1)
+})

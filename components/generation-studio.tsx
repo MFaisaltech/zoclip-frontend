@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, Check, Film, Link2, LoaderCircle, Play, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react'
+import { ArrowRight, Link2, Play, ShieldCheck, Sparkles, UploadCloud } from 'lucide-react'
 import { AuthApiError } from '@/lib/auth-api'
 import { mediaApi, mediaErrorMessage, type MediaSchemas } from '@/lib/media-api'
 import { workspaceApi, matches } from '@/lib/workspace-api'
@@ -10,6 +10,7 @@ import { canonicalYouTubeUrl } from '@/lib/youtube-url'
 import { confirmGeneration, quoteForVideo, type GenerationQuote } from '@/lib/generation-flow'
 import { readUpload, runUpload, uploadStorageKey, uploadLimit, uploadProgressLabel, type UploadProgress } from '@/lib/resumable-upload'
 import { JobMonitor } from './job-monitor'
+import { ProcessingProgress } from './processing-progress'
 
 type Job = MediaSchemas['JobView']
 type Phase = 'idle' | 'preparing' | 'quoting' | 'review' | 'submitting' | 'processing' | 'complete'
@@ -34,12 +35,24 @@ export default function GenerationStudio({owner, visible, videoId, jobId, onJob,
   const [balance, setBalance] = useState<number | null>(null), [error, setError] = useState<unknown>(null)
   const [progress, setProgress] = useState<UploadProgress | null>(null), [loaded, setLoaded] = useState(false)
   const [resume, setResume] = useState(false), [notice, setNotice] = useState('')
+  const [limitsReady, setLimitsReady] = useState(false)
   const control = useRef<AbortController | null>(null), handled = useRef('')
   const importAttempt = useRef<{url: string; key: string} | null>(null)
   const callbacks = useRef({onJob, onChanged}); callbacks.current = {onJob, onChanged}
   const picker = useRef<HTMLInputElement | null>(null)
   const storageKey = `zoclip-generation-v3:${owner}`
   function save(value: Saved) {sessionStorage.setItem(storageKey, JSON.stringify(value))}
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setLimitsReady(false)
+    void mediaApi.call('billingOverview', {signal: controller.signal}).then(billing => {
+      if (controller.signal.aborted) return
+      const maximum = Math.max(1, Math.min(6, billing.plan?.price?.rules.max_outputs ?? 6))
+      setMaxCount(maximum); setCount(value => Math.min(value, maximum)); setLimitsReady(true)
+    }, cause => {if (!controller.signal.aborted) {setError(cause); setLimitsReady(true)}})
+    return () => controller.abort()
+  }, [owner])
 
   async function quote(id: string, wanted = count) {
     if (control.current) return
@@ -149,7 +162,7 @@ export default function GenerationStudio({owner, visible, videoId, jobId, onJob,
         setBalance(wallet.available_credits)
         const maximum = Math.min(6, billing.plan?.price?.rules.max_outputs ?? 6)
         setMaxCount(maximum)
-        if (count > maximum) {setCount(maximum); throw new AuthApiError(422, 'plan_limit')}
+        if (count > maximum) {setCount(maximum); throw new AuthApiError(422, 'clip_limit')}
         const minimum = billing.plan?.price?.rules.minimum_job_credits ?? 1
         if (!privatePreview && wallet.available_credits < minimum) throw new AuthApiError(409, 'insufficient_credits')
         setPhase('preparing')
@@ -200,7 +213,6 @@ export default function GenerationStudio({owner, visible, videoId, jobId, onJob,
   }
   const busy = ['preparing', 'quoting', 'submitting', 'processing'].includes(phase)
   const insufficient = request && !request.confirmed && balance !== null && balance < request.quote.credits
-  const step = phase === 'complete' ? 3 : phase === 'processing' || phase === 'submitting' ? 2 : sourceId ? 1 : 0
   return <section hidden={!visible} aria-label="Generate clips" className="mb-9 overflow-hidden rounded-3xl border border-[#e3ddef] bg-white shadow-[0_8px_40px_-24px_#7960be]">
     <div className="border-b border-[#eee9f4] bg-gradient-to-r from-[#faf8ff] to-white px-5 py-5 sm:px-8">
       <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-lg font-semibold"><Sparkles size={19} className="text-[#7668df]"/>Create your next clips</h2><span className="flex items-center gap-1.5 text-xs text-[#877d98]"><ShieldCheck size={14}/>Private by default</span></div>
@@ -213,8 +225,7 @@ export default function GenerationStudio({owner, visible, videoId, jobId, onJob,
       {!sourceId && <>
         <div id="panel-youtube" role="tabpanel" aria-labelledby="source-youtube" hidden={mode !== 'youtube'}>
           <label htmlFor="video-url" className="mb-2 block text-sm font-medium">YouTube video link</label>
-          <div className="relative"><Link2 size={18} className="pointer-events-none absolute left-4 top-4 text-[#9b91ae]"/><input id="video-url" className={`${input} !pl-11`} type="url" inputMode="url" maxLength={2048} value={url} disabled={busy} onChange={e => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" aria-describedby="youtube-help"/></div>
-          <p id="youtube-help" className="mt-2 text-xs leading-5 text-[#8d849c]">YouTube videos, Shorts and shared links. Paste a link to a video you have permission to use.</p>
+          <div className="relative"><Link2 size={18} className="pointer-events-none absolute left-4 top-4 text-[#9b91ae]"/><input id="video-url" className={`${input} !pl-11`} type="url" inputMode="url" maxLength={2048} value={url} disabled={busy} onChange={e => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=…" /></div>
         </div>
         <div id="panel-upload" role="tabpanel" aria-labelledby="source-upload" hidden={mode !== 'upload'}>
           <label htmlFor="video-file" className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#ded6ed] bg-[#fcfbfe] px-4 py-6 text-center"><UploadCloud size={26} className="text-[#8875ce]"/><span className="text-sm font-medium">{file ? file.name : 'Choose a video to turn into clips'}</span><span className="text-xs text-[#8d849c]">MP4 or WebM · Up to 4 GB and 2 hours, subject to account limits</span><input ref={picker} id="video-file" aria-label="Video file" className="mt-2 max-w-full text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-[#eee8fb] file:px-3 file:py-2 file:text-[#6552c4]" type="file" accept="video/mp4,video/webm,.mp4,.webm" disabled={busy} onChange={e => {setFile(e.target.files?.[0] ?? null); setError(null)}}/></label>
@@ -222,15 +233,18 @@ export default function GenerationStudio({owner, visible, videoId, jobId, onJob,
           {file && (file.size > uploadLimit || file.size === 0) && <p role="alert" className="mt-3 text-sm text-red-800">Choose a nonempty video under 4 GB.</p>}
         </div>
       </>}
-      <div className="my-5 flex flex-wrap items-center justify-between gap-4"><label htmlFor="generation-count" className="flex items-center gap-3 text-sm text-[#6f657f]">Clips to create<select id="generation-count" value={count} disabled={busy || !!sourceId} onChange={e => setCount(Number(e.target.value))} className="rounded-lg border border-[#e3ddec] bg-white px-3 py-2 text-[#443854]">{Array.from({length: maxCount}, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></label><p className="flex items-center gap-1.5 text-xs text-[#8d849c]"><Check size={14}/>Captions & vertical framing included in your quote</p></div>
-      {sourceId && <div className="mb-5 rounded-2xl border border-[#e4dcef] bg-[#f8f5ff] p-5"><p className="flex items-center gap-2 text-sm font-medium text-[#6552a0]"><Film size={17}/>Your video is ready</p>{request ? <><p className="mt-3 text-2xl font-semibold text-[#39294e]">{request.quote.credits.toLocaleString()} <span className="text-sm font-normal">credits · up to {request.quote.request.output_count} {request.quote.request.output_count === 1 ? 'clip' : 'clips'}</span></p><p className="mt-2 text-sm text-[#7d708f]">Available: {balance?.toLocaleString() ?? 'Checking…'} credits. Review this exact price before confirming.</p><p className="mt-2 text-xs leading-5 text-[#8c809b]">This quote covers the attempt, even if fewer moments are found. Failed or canceled attempts return your credits under the existing rules.</p></> : phase === 'complete' ? <p className="mt-3 text-sm text-[#7d708f]">Generation complete. Preview and download your clips below.</p> : phase === 'quoting' ? <p role="status" className="mt-3 text-sm">Calculating your exact price…</p> : <p className="mt-3 text-sm text-[#7d708f]">Your source is saved. Check the price to continue.</p>}</div>}
+      <div className="my-5 flex flex-wrap items-center justify-between gap-4"><label htmlFor="generation-count" className="flex items-center gap-3 text-sm text-[#6f657f]">Clips to create<select id="generation-count" value={count} disabled={!limitsReady || busy || !!request?.confirmed} onChange={e => {
+        const wanted = Number(e.target.value); setCount(wanted)
+        if (sourceId) {setRequest(null); void quote(sourceId, wanted)}
+      }} className="rounded-lg border border-[#e3ddec] bg-white px-3 py-2 text-[#443854]">{Array.from({length: maxCount}, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></label><span className="text-xs text-[#8d849c]">Up to {maxCount} with your plan</span></div>
+      {sourceId && request && <div className="mb-5 rounded-2xl border border-[#e4dcef] bg-[#f8f5ff] p-5"><p className="text-xl font-semibold text-[#39294e]">{request.quote.request.output_count} {request.quote.request.output_count === 1 ? 'clip' : 'clips'} · {request.quote.credits.toLocaleString()} credits</p><p className="mt-2 text-xs text-[#8c809b]">Charged only for delivered clips. Unused credits are returned.</p></div>}
       {insufficient && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">You need {request!.quote.credits - balance!} more credits. No chargeable job has started. Your prepared video is saved.</p>}
       {request?.confirmed && <p className="mb-3 text-xs text-[#82758e]">If the connection was interrupted, retrying checks the original request without starting a duplicate.</p>}
       {!!error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-800">{mediaErrorMessage(error)}</p>}
       {notice && <p role="status" className="mb-4 rounded-xl bg-[#f5f2fa] p-4 text-sm leading-6 text-[#6f637e]">{notice}</p>}
-      <div className="flex flex-col gap-4 border-t border-[#efeaf4] pt-5 sm:flex-row sm:items-center sm:justify-between"><p className="max-w-md text-xs leading-5 text-[#93889e]">By selecting Generate Clips, you confirm you own this video or have permission to import, upload and process it. Preparation is free; generation starts only after you confirm the exact quote.</p><button disabled={!loaded || busy || phase === 'complete' || !!insufficient || (privatePreview && !!sourceId) || (!sourceId && (mode === 'youtube' ? !url.trim() : !file || file.size === 0 || file.size > uploadLimit))} onClick={() => {void generate()}} className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#7668df] px-6 py-3 text-sm font-semibold text-white shadow-[0_4px_14px_-6px_#7668df] transition hover:bg-[#6555cf] disabled:cursor-not-allowed disabled:opacity-50">{busy ? <LoaderCircle size={17} className="animate-spin"/> : <Sparkles size={17}/>}Generate Clips{!busy && <ArrowRight size={16}/>}</button></div>
-      <ol aria-label="Generation progress" className="mt-6 grid grid-cols-3 gap-2 text-xs text-[#9a90a5]">{['Prepare video', 'Review price', 'Create clips'].map((label, i) => <li key={label} aria-current={step === i ? 'step' : undefined} className={`flex items-center gap-2 border-t-2 pt-3 ${step >= i ? 'border-[#a18be0] text-[#7862b0]' : 'border-[#eee9f3]'}`}><span className="grid size-5 shrink-0 place-items-center rounded-full bg-[#f4f0fa] text-[10px]">{step > i ? <Check size={12}/> : i + 1}</span>{label}</li>)}</ol>
-      {progress && <div role="status" className="mt-5 text-sm text-[#786b89]"><p>{uploadProgressLabel(progress)}</p><progress aria-label="Upload progress" className="mt-3 h-2 w-full accent-[#8a73d7]" value={['hashing', 'uploading'].includes(progress.stage) ? progress.bytes : undefined} max={progress.total}/>{['hashing', 'uploading'].includes(progress.stage) && <p className="mt-1 text-xs">{Math.round(progress.bytes / progress.total * 100)}% {progress.stage === 'hashing' ? 'prepared' : 'uploaded'}</p>}<button className={`${secondary} mt-3`} onClick={() => control.current?.abort()}>Pause transfer</button></div>}
+      <div className="flex justify-end border-t border-[#efeaf4] pt-5"><button disabled={!loaded || !limitsReady || busy || phase === 'complete' || !!insufficient || (privatePreview && !!sourceId) || (!sourceId && (mode === 'youtube' ? !url.trim() : !file || file.size === 0 || file.size > uploadLimit))} onClick={() => {void generate()}} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#7668df] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#6555cf] disabled:cursor-not-allowed disabled:opacity-50"><Sparkles size={17}/>{busy ? 'Working…' : request ? request.confirmed ? 'Check original request' : 'Confirm & Generate' : 'Generate Clips'}{!busy && <ArrowRight size={16}/>}</button></div>
+      <details className="mt-3 text-xs text-[#93889e]"><summary className="cursor-pointer">Content permission</summary><p className="mt-2">Only upload or import videos you own or have permission to process. Selecting Generate Clips confirms this permission. Preparation is free; generation requires your credit confirmation.</p></details>
+      {busy && !job && <div className="mt-5"><ProcessingProgress stage={phase === 'quoting' ? 'Checking price' : phase === 'submitting' ? 'Starting generation' : progress ? uploadProgressLabel(progress).replace(/…$/, '') : 'Importing'} percent={progress?.stage === 'uploading' && progress.total > 0 ? progress.bytes / progress.total * 100 : undefined}/>{progress && <button className={`${secondary} mt-3`} onClick={() => control.current?.abort()}>Pause transfer</button>}</div>}
       {job && <div className="mt-6"><JobMonitor jobId={job.id} onChanged={() => callbacks.current.onChanged()} onUpdate={updateJob}/></div>}
       {phase === 'complete' && <p role="status" className="mt-5 text-sm font-medium text-green-800">Your clips are ready in Your Clips below.</p>}
       {!busy && (sourceId || job || phase === 'complete') && <div className="mt-4 flex flex-wrap gap-2"><button className={secondary} onClick={reset}>Start another video</button>{sourceId && phase !== 'complete' && !request?.confirmed && <button className={secondary} onClick={() => {void quote(sourceId)}}>Refresh price</button>}</div>}

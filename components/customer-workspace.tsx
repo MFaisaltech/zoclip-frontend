@@ -32,6 +32,9 @@ function ClipCard({clip,onEdit}:{clip:Clip;onEdit:()=>void}) {
   const [output,setOutput]=useState<MediaSchemas['OutputView']|null>(null)
   const [url,setUrl]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(null)
   const ref=useRef(''),control=useRef<AbortController|null>(null)
+  const player=useRef<HTMLVideoElement|null>(null), previewRequested=useRef(false)
+  useEffect(()=>{if(ref.current)URL.revokeObjectURL(ref.current);ref.current='';setUrl('')},[clip.id,output?.revision])
+  useEffect(()=>{if(url&&previewRequested.current)void player.current?.play().catch(()=>{/* Browser controls remain available if autoplay is blocked. */})},[url])
   useEffect(()=>{
     const controller=new AbortController();let timer:ReturnType<typeof setTimeout>
     async function load() {
@@ -49,13 +52,14 @@ function ClipCard({clip,onEdit}:{clip:Clip;onEdit:()=>void}) {
   },[clip.id,clip.revision])
   async function receive(download:boolean) {
     if(control.current||!output||output.state!=='COMPLETE')return
-    const controller=new AbortController();control.current=controller;setBusy(true);setError(null)
+    const controller=new AbortController();control.current=controller;setBusy(true);setError(null);previewRequested.current=!download
     try {
       let target=ref.current
       if(!target) {
         const blob=await mediaApi.call('download',{params:{clip_id:clip.id},query:{revision:output.revision},signal:controller.signal})
         target=URL.createObjectURL(blob);ref.current=target;setUrl(target)
       }
+      if(!download&&target===ref.current)void player.current?.play().catch(()=>undefined)
       if(download){const anchor=document.createElement('a');anchor.href=target;anchor.download=`${(clip.preferences.title||'ZoClip').replace(/[^a-zA-Z0-9 _-]/g,'').slice(0,80)||'ZoClip'}.mp4`;anchor.click()}
     }catch(cause){if(!controller.signal.aborted)setError(cause)}
     finally{control.current=null;if(!controller.signal.aborted)setBusy(false)}
@@ -63,10 +67,10 @@ function ClipCard({clip,onEdit}:{clip:Clip;onEdit:()=>void}) {
   const ready=output?.state==='COMPLETE'
   return <article className="overflow-hidden rounded-2xl border border-[#e8e4de] bg-white">
     <div className="grid min-h-56 place-items-center bg-[#252136] p-4">
-      {url?<video aria-label={`${clip.preferences.title||'Clip'} preview`} src={url} controls playsInline preload="metadata" className="max-h-96 w-full rounded-lg"><track kind="captions"/>Your browser cannot play this video.</video>:<button className="flex flex-col items-center gap-4 text-white disabled:opacity-60" disabled={!ready||busy} onClick={()=>{void receive(false)}}><span className="grid size-14 place-items-center rounded-full bg-white/15">{busy?<LoaderCircle className="animate-spin"/>:ready?<Play fill="currentColor"/>:<Film/>}</span><span className="text-sm">{busy?'Loading preview…':ready?'Preview clip':output?.state==='FAILED'?'Clip needs attention':'Preparing clip…'}</span></button>}
+      {url?<video ref={player} aria-label={`${clip.preferences.title||'Clip'} preview`} src={url} controls playsInline preload="metadata" className="max-h-96 w-full rounded-lg"><track kind="captions"/>Your browser cannot play this video.</video>:<button className="flex flex-col items-center gap-4 text-white disabled:opacity-60" disabled={!ready||busy} onClick={()=>{void receive(false)}}><span className="grid size-14 place-items-center rounded-full bg-white/15">{busy?<LoaderCircle className="animate-spin"/>:ready?<Play fill="currentColor"/>:<Film/>}</span><span className="text-sm">{busy?'Loading preview…':ready?'Preview clip':output?.state==='FAILED'?'Clip needs attention':'Preparing clip…'}</span></button>}
     </div>
     <div className="p-5"><div className="mb-3 flex items-center justify-between gap-2"><span className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${ready?'bg-[#e9f5ed] text-[#428360]':output?.state==='FAILED'?'bg-red-50 text-red-800':'bg-[#f1edfa] text-[#8a74ba]'}`}>{ready?'Ready':output?.state==='FAILED'?'Needs attention':'Processing'}</span><span className="text-xs text-[#a093ae]">{durationLabel((clip.preferences.end_ms-clip.preferences.start_ms)/1000)}</span></div><h3 className="font-semibold">{clip.preferences.title||'Your clip'}</h3><p className="mt-2 text-xs text-[#9990a4]">Vertical MP4 · Captions & moments from your video</p>
-      <div className="mt-4 flex flex-wrap gap-2"><button className={button} disabled={!ready||busy} onClick={()=>{void receive(false)}}><Play size={14}/>Preview</button><button className={button} disabled={!ready||busy} onClick={()=>{void receive(true)}}><Download size={15}/>{busy?'Loading…':'Download'}</button><button className="min-h-11 px-2 text-xs text-[#9c8cb7] underline-offset-4 hover:underline disabled:opacity-50" disabled={!ready} onClick={onEdit}>Edit</button></div>
+      <div className="mt-4 flex flex-wrap gap-2"><button className={button} disabled={!ready||busy} onClick={()=>{void receive(false)}}><Play size={14}/>Play</button><button className={button} disabled={!ready||busy} onClick={()=>{void receive(true)}}><Download size={15}/>{busy?'Loading…':'Download'}</button><button className="min-h-11 px-2 text-xs text-[#9c8cb7] underline-offset-4 hover:underline disabled:opacity-50" disabled={!ready} onClick={onEdit}>Edit</button></div>
       {!!error&&<p role="alert" className="mt-3 text-sm text-red-800">{mediaErrorMessage(error)}</p>}
     </div>
   </article>
@@ -76,7 +80,7 @@ function Credits() {
   const balance=useWorkspaceResource('wallet'), overview=useFinance('billingOverview'), history=useWorkspaceResource('transactions')
   return <div className="space-y-6"><div><h1 className="text-3xl font-semibold tracking-tight">Credits & plans</h1><p className="mt-2 text-sm text-[#77736e]">See the price before you create. Pay only when your clips are ready.</p></div>
     <section className={panel}><h2 className="font-semibold">Your balance</h2>{balance.status==='loading'?<p role="status" className="mt-4">Loading…</p>:balance.status==='error'?<><p role="alert" className="my-3 text-sm">{mediaErrorMessage(balance.error)}</p><button className={button} onClick={()=>{void balance.refresh()}}>Try again</button></>:<><p className="mt-4 text-4xl font-semibold">{balance.data?.available_credits.toLocaleString()} <span className="text-base font-normal text-[#77736e]">credits</span></p><p className="mt-3 text-sm text-[#77736e]">Credits being used for current videos: {balance.data?.reserved_credits.toLocaleString()}</p></>}</section>
-    <section className={`${panel} !bg-[#f4f1ff]`}><h2 className="font-semibold">Buy credits via WhatsApp</h2><p className="mt-2 text-sm leading-6 text-[#77736e]">Request verified payment instructions, then share your registered email and payment screenshot. Credits are added only after independent admin verification. There are no automatic renewals, and your credits do not expire.</p></section>
+    <section className={`${panel} !bg-[#f4f1ff]`}><h2 className="font-semibold">Buy credits via WhatsApp</h2><p className="mt-2 text-sm leading-6 text-[#77736e]">Request verified payment instructions, then share your registered email and payment screenshot. Credits are added only after independent admin verification. There are no automatic renewals. Your plan validity appears in your account.</p></section>
     {!!overview.data?.plan?.price?.rules.minimum_job_credits&&<p className="text-sm text-[#77736e]">Each video has a minimum price of {overview.data.plan.price.rules.minimum_job_credits} credits, including shorter videos. Review the exact price before generating.</p>}
     {overview.data?.plan?.price&&<section className={panel}><h2 className="font-semibold">How clipping is priced</h2><p className="mt-3 text-sm leading-7 text-[#77736e]">{overview.data.plan.price.rules.credits_per_minute===0?`${overview.data.plan.price.rules.credits_per_output} credits per successfully generated clip.`:`${overview.data.plan.price.rules.credits_per_minute} credits per started source minute plus ${overview.data.plan.price.rules.credits_per_output} per clip under your existing terms.`} Captions and vertical framing {overview.data.plan.price.rules.captions_credits+overview.data.plan.price.rules.reframe_credits===0?'are included.':'are shown in your price before you confirm.'}</p><p className="mt-2 text-sm text-[#77736e]">Up to {overview.data.plan.price.rules.max_outputs} clips per video. Your exact price appears beside Generate clips.</p></section>}
     <Pricing/>

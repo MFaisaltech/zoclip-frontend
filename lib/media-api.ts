@@ -8,6 +8,10 @@ const uuid = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
 export function mediaErrorMessage(error: unknown): string {
   if (!(error instanceof AuthApiError)) return 'Unable to finish. Retry to check the server and continue.'
   const messages: Record<string, string> = {
+    clip_limit: 'Choose fewer clips to match your plan.',
+    link_unavailable: 'This YouTube video is unavailable. Upload the original video instead.',
+    link_provider_unavailable: 'YouTube declined the download. Try later or upload your video.',
+    link_connection_failed: 'YouTube connection failed. Please retry.',
     insufficient_credits: 'You need more credits to create these clips. No new attempt was started.',
     lifetime_output_limit: 'Your lifetime trial clip has already been used or is being generated.',
     revision_conflict: 'This clip has changed. Reload it before saving your edits.',

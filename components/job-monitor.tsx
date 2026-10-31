@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AuthApiError } from '@/lib/auth-api'
 import { mediaApi, mediaErrorMessage, type MediaSchemas } from '@/lib/media-api'
-import { jobStatus } from '@/lib/customer-copy'
+import { ProcessingProgress, processingStage } from './processing-progress'
 
 type Job = MediaSchemas['JobView']
 const panel = 'rounded-2xl border border-[#e8e4de] bg-[#fcfbfe] p-5'
@@ -36,10 +36,8 @@ export function JobMonitor({jobId, onChanged, onUpdate}: {jobId: string; onChang
     return () => {controller.abort(); clearTimeout(timer)}
   }, [jobId, retry])
   return <section aria-label="Video progress" className={panel}>
-    <h2 role="status" className="text-lg font-semibold">{job ? jobStatus(job.state, job.kind) : 'Checking progress…'}</h2>
+    <ProcessingProgress stage={job ? processingStage(job.stage, job.kind, job.state) : 'Checking progress'} percent={job?.progress_percent} active={!job || !finalJob(job)} detail={job?.state === 'QUEUED' ? 'Waiting for an available worker' : undefined}/>
     {job && <>
-      {!finalJob(job) && <p className="mt-3 text-sm leading-6 text-[#77736e]">{['VALIDATE','IMPORT'].includes(job.kind) ? 'We’re preparing your video. You can leave this page and come back.' : 'We’ll find the best moments and turn them into shareable clips. You can leave this page and come back.'}</p>}
-      {job.progress_percent !== null && !finalJob(job) && <progress className="my-4 w-full accent-[#7668df]" aria-label="Video progress" value={job.progress_percent} max={100}/>}
       {job.state === 'FAILED' && <p className="mt-3 text-sm text-red-800">{job.error_code ? mediaErrorMessage(new AuthApiError(409,job.error_code)) : 'Please try again. Credits for this attempt have been returned.'}</p>}
       {job.state === 'WAITING_ENGINE' && <p className="mt-3 text-sm">Please try again later, or cancel to return the credits for this attempt.</p>}
       {job.state === 'CANCEL_REQUESTED' && <p className="mt-3 text-sm">We’re stopping this attempt safely. Your balance will update when cancellation is complete.</p>}
